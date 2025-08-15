@@ -22,7 +22,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     private messageHandler: MessageHandler,
     @Inject(forwardRef(() => CallbackHandler))
     private callbackHandler: CallbackHandler,
-  ) {}
+  ) { }
 
   onModuleInit() {
     // Allow disabling Telegram bot via environment variable
@@ -213,7 +213,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         await this.sendMessage(
           msg.chat.id,
           "🤖 Hello! I'm your crypto wallet assistant. I can help you manage your wallet, check balances, send payments, and create payment links.\n\n" +
-            'Send me a message to get started!',
+          'Send me a message to get started!',
         );
       }
     });
