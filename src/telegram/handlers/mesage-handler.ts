@@ -12,6 +12,7 @@ import {
 } from 'src/payment-link/payment-link.model';
 import { BlockchainNetwork } from 'src/wallet/wallet.model';
 import { McpService } from 'src/mcp/mcp.service';
+import { MastraService } from 'src/mastra/mastra.service';
 import * as QRCode from 'qrcode';
 
 interface PaymentLinkCreationState {
@@ -36,7 +37,8 @@ export class MessageHandler {
     private paraService: ParaService,
     private paymentLinkRepository: PaymentLinkRepository,
     private mcpService: McpService,
-  ) {}
+    private mastraService: MastraService,
+  ) { }
 
   async handleMessage(msg: TelegramBot.Message) {
     const chatId = msg.chat.id;
@@ -126,11 +128,60 @@ export class MessageHandler {
         `Processing natural language request from user ${userId}: "${text}"`,
       );
 
-      // Use MCP service to process the natural language request
-      const response = await this.mcpService.processNaturalLanguage(
-        text,
-        userId,
-      );
+      // Check if the message is asking for balance or payment link creation
+      const lowerText = text.toLowerCase();
+      const isBalanceRequest = lowerText.includes('balance') ||
+        lowerText.includes('check') ||
+        lowerText.includes('show') ||
+        lowerText.includes('wallet');
+
+      const isPaymentRequest = lowerText.includes('payment') ||
+        lowerText.includes('link') ||
+        lowerText.includes('create') ||
+        lowerText.includes('pay');
+
+      let response: string;
+
+      if (isBalanceRequest && !isPaymentRequest) {
+        // Use Mastra AI agent to check balance
+        try {
+          const agent = this.mastraService.getAgent();
+          if (agent) {
+            const balanceResult = await agent.executeBalanceCheck(userId);
+            if (balanceResult.success) {
+              const balanceData = balanceResult.data;
+              response = this.formatBalanceResponse(balanceData);
+            } else {
+              response = `❌ ${balanceResult.error}`;
+            }
+          } else {
+            response = await this.mastraService.checkUserBalance(userId);
+          }
+        } catch (error) {
+          this.logger.error('Error with Mastra balance check:', error);
+          // Fallback to MCP service
+          response = await this.mcpService.processNaturalLanguage(text, userId);
+        }
+      } else if (isPaymentRequest && !isBalanceRequest) {
+        // Use Mastra AI agent for payment link guidance
+        response = await this.mastraService.processNaturalLanguage(
+          text,
+          userId,
+          chatId.toString()
+        );
+
+        // If the AI suggests creating a payment link, guide user to use /payment command
+        if (response.toLowerCase().includes('payment link') || response.toLowerCase().includes('create')) {
+          response += '\n\nTo create a payment link, use the /payment command or click the button below.';
+        }
+      } else {
+        // Use Mastra AI agent for general processing
+        response = await this.mastraService.processNaturalLanguage(
+          text,
+          userId,
+          chatId.toString()
+        );
+      }
 
       await this.telegramService.sendMessage(chatId, response, {
         reply_markup: {
@@ -529,10 +580,10 @@ export class MessageHandler {
       await this.telegramService.sendMessage(
         chatId,
         `🔗 <b>Create Payment Link</b>\n\n` +
-          `Let's create a payment link for your business!\n\n` +
-          `<b>Step 1 of 4:</b> What would you like to name this payment?\n\n` +
-          `<i>Example: "Coffee Shop Order", "Service Payment", "Product Purchase"</i>\n\n` +
-          `Type <code>/cancel</code> to cancel anytime.`,
+        `Let's create a payment link for your business!\n\n` +
+        `<b>Step 1 of 4:</b> What would you like to name this payment?\n\n` +
+        `<i>Example: "Coffee Shop Order", "Service Payment", "Product Purchase"</i>\n\n` +
+        `Type <code>/cancel</code> to cancel anytime.`,
       );
     } catch (error) {
       this.logger.error('Error in payment command:', error);
@@ -635,8 +686,8 @@ export class MessageHandler {
     await this.telegramService.sendMessage(
       chatId,
       `✅ Payment name set: <b>${text}</b>\n\n` +
-        `<b>Step 2 of 4:</b> Which token would you like to accept?\n\n` +
-        `Please choose one of the following:`,
+      `<b>Step 2 of 4:</b> Which token would you like to accept?\n\n` +
+      `Please choose one of the following:`,
       {
         reply_markup: {
           inline_keyboard: [
@@ -679,9 +730,9 @@ export class MessageHandler {
     await this.telegramService.sendMessage(
       chatId,
       `✅ Token selected: ${tokenEmoji} <b>${upperText}</b>\n\n` +
-        `<b>Step 3 of 4:</b> What's the amount you want to request?\n\n` +
-        `<i>Example: 10.50, 100, 0.5</i>\n\n` +
-        `Please enter the amount in ${upperText}:`,
+      `<b>Step 3 of 4:</b> What's the amount you want to request?\n\n` +
+      `<i>Example: 10.50, 100, 0.5</i>\n\n` +
+      `Please enter the amount in ${upperText}:`,
     );
 
     this.paymentCreationStates.set(userId, state);
@@ -710,12 +761,12 @@ export class MessageHandler {
     await this.telegramService.sendMessage(
       chatId,
       `✅ Amount set: <b>${amount} ${state.token}</b>\n\n` +
-        `<b>Step 4 of 4:</b> What customer details would you like to collect?\n\n` +
-        `<i>Examples: name, email, phone, address, notes</i>\n\n` +
-        `You can type:\n` +
-        `• Single fields: "name" then "email" then "phone"\n` +
-        `• Multiple fields at once: "name, email, phone, age"\n\n` +
-        `Type <b>"done"</b> when finished:`,
+      `<b>Step 4 of 4:</b> What customer details would you like to collect?\n\n` +
+      `<i>Examples: name, email, phone, address, notes</i>\n\n` +
+      `You can type:\n` +
+      `• Single fields: "name" then "email" then "phone"\n` +
+      `• Multiple fields at once: "name, email, phone, age"\n\n` +
+      `Type <b>"done"</b> when finished:`,
     );
 
     this.paymentCreationStates.set(userId, state);
@@ -761,8 +812,8 @@ export class MessageHandler {
       await this.telegramService.sendMessage(
         chatId,
         `✅ Added fields: <b>${fields.join(', ')}</b>\n\n` +
-          `<b>Current fields:</b>\n${detailsList}\n\n` +
-          `Type more fields (comma-separated or one by one) or <b>"done"</b> to continue:`,
+        `<b>Current fields:</b>\n${detailsList}\n\n` +
+        `Type more fields (comma-separated or one by one) or <b>"done"</b> to continue:`,
       );
     } else {
       // Add single field (initialize with empty string)
@@ -775,8 +826,8 @@ export class MessageHandler {
       await this.telegramService.sendMessage(
         chatId,
         `✅ Added field: <b>${lowerText}</b>\n\n` +
-          `<b>Current fields:</b>\n${detailsList}\n\n` +
-          `Type another field (or comma-separated fields) or <b>"done"</b> to continue:`,
+        `<b>Current fields:</b>\n${detailsList}\n\n` +
+        `Type another field (or comma-separated fields) or <b>"done"</b> to continue:`,
       );
     }
 
@@ -795,8 +846,8 @@ export class MessageHandler {
     const detailsList =
       state.details && Object.keys(state.details).length > 0
         ? Object.keys(state.details)
-            .map((field, index) => `  ${index + 1}. ${field}`)
-            .join('\n')
+          .map((field, index) => `  ${index + 1}. ${field}`)
+          .join('\n')
         : '  (No details to collect)';
 
     const confirmationText =
@@ -903,16 +954,15 @@ export class MessageHandler {
       // Generate QR code for the payment link
       const qrCodeBuffer = await this.generateQRCode(linkUrl);
 
-      // Send the text message first
-      await this.telegramService.sendMessage(
-        chatId,
-        `🎉 <b>Payment Link Created Successfully!</b>\n\n` +
-          `<b>Name:</b> ${state.name}\n` +
-          `<b>Amount:</b> ${state.amount} ${tokenEmoji} ${state.token}\n\n` +
-          `<b>Payment Link:</b>\n${linkUrl}\n\n` +
-          `<b>Link ID:</b> <code>${linkId}</code>\n\n` +
-          `📱 <b>QR Code below for easy sharing!</b>`,
-      );
+      // Send the text message first with preview image if available
+      let messageText = `🎉 <b>Payment Link Created Successfully!</b>\n\n` +
+        `<b>Name:</b> ${state.name}\n` +
+        `<b>Amount:</b> ${state.amount} ${tokenEmoji} ${state.token}\n\n` +
+        `<b>Payment Link:</b>\n${linkUrl}\n\n` +
+        `<b>Link ID:</b> <code>${linkId}</code>\n\n` +
+        `📱 <b>QR Code below for easy sharing!</b>`;
+
+      await this.telegramService.sendMessage(chatId, messageText);
 
       // Send the QR code as a photo
       await this.telegramService.sendPhoto(chatId, qrCodeBuffer, {
@@ -1022,5 +1072,38 @@ export class MessageHandler {
     } catch (error) {
       this.logger.error('Error ensuring user exists:', error);
     }
+  }
+
+  private formatBalanceResponse(balanceData: any): string {
+    if (!balanceData) {
+      return '❌ No balance data available';
+    }
+
+    let balanceText = `💰 <b>Your Wallet Balance</b>\n\n`;
+
+    // Native balances
+    if (balanceData.nativeBalances) {
+      if (balanceData.nativeBalances.ETH) {
+        balanceText += `<b>🔷 ETH:</b> ${balanceData.nativeBalances.ETH.balance} ETH\n`;
+      }
+      if (balanceData.nativeBalances.MNT) {
+        balanceText += `<b>🟢 MNT:</b> ${balanceData.nativeBalances.MNT.balance} ${balanceData.nativeBalances.MNT.symbol}\n`;
+      }
+    }
+
+    // Token balances
+    if (balanceData.tokenBalances && balanceData.tokenBalances.length > 0) {
+      balanceText += `\n<b>🪙 Token Balances:</b>\n`;
+
+      for (const token of balanceData.tokenBalances) {
+        const emoji = token.symbol === 'USDC' ? '🔵' :
+          token.symbol === 'USDT' ? '🟢' : '🟡';
+        balanceText += `${emoji} <b>${token.symbol}:</b> ${token.balance}\n`;
+      }
+    }
+
+    balanceText += `\n<b>📍 Wallet Address:</b>\n<code>${balanceData.walletAddress}</code>`;
+
+    return balanceText;
   }
 }

@@ -56,7 +56,7 @@ export class McpService {
     private readonly paraService: ParaService,
     private readonly paymentLinkRepository: PaymentLinkRepository,
     private readonly userRepository: UserRepository,
-  ) {}
+  ) { }
 
   async listTools(): Promise<McpTool[]> {
     return [
@@ -533,8 +533,8 @@ export class McpService {
     const detailsList =
       state.details && Object.keys(state.details).length > 0
         ? Object.keys(state.details)
-            .map((field, index) => `  ${index + 1}. ${field}`)
-            .join('\n')
+          .map((field, index) => `  ${index + 1}. ${field}`)
+          .join('\n')
         : '  (No details to collect)';
 
     return {
@@ -673,8 +673,8 @@ export class McpService {
       const detailsList =
         state.details && Object.keys(state.details).length > 0
           ? Object.keys(state.details)
-              .map((field, index) => `  ${index + 1}. ${field}`)
-              .join('\n')
+            .map((field, index) => `  ${index + 1}. ${field}`)
+            .join('\n')
           : '  (No details to collect)';
 
       // Generate QR code as buffer

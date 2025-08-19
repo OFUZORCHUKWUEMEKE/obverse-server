@@ -12,6 +12,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TelegramModule } from './telegram/telegram.module';
 import { ParaModule } from './para/para.module';
 import { McpModule } from './mcp/mcp.module';
+import { MastraController } from './mastra/mastra.controller';
+import { MastraService } from './mastra/mastra.service';
+import { MastraModule } from './mastra/mastra.module';
 import leanVirtuals from 'mongoose-lean-virtuals';
 
 const config = configuration();
@@ -47,8 +50,9 @@ const config = configuration();
     TelegramModule,
     ParaModule,
     McpModule,
+    MastraModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  controllers: [AppController, MastraController],
+  providers: [AppService, MastraService],
 })
-export class AppModule {}
+export class AppModule { }

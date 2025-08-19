@@ -11,6 +11,7 @@ import { CallbackHandler } from './handlers/callback.handler';
 import { MessageHandler } from './handlers/mesage-handler';
 import { ParaModule } from 'src/para/para.module';
 import { McpModule } from 'src/mcp/mcp.module';
+import { MastraModule } from 'src/mastra/mastra.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { McpModule } from 'src/mcp/mcp.module';
     TransactionModule,
     ParaModule,
     McpModule,
+    MastraModule,
   ],
   providers: [TelegramService, CallbackHandler, MessageHandler],
   controllers: [TelegramController],
