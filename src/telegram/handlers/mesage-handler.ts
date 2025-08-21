@@ -1034,6 +1034,7 @@ export class MessageHandler {
       };
 
       const paymentLink = await this.paymentLinkRepository.create({
+        address: wallet.address,
         creatorUserId: user._id,
         creatorWalletId: wallet._id,
         linkId,

@@ -66,6 +66,9 @@ export class PaymentLink {
   @Prop()
   recipientName?: string;
 
+  @Prop()
+  address?: string; // Wallet address created by Para
+
   @Prop({ required: true })
   linkUrl: string; // Full payment URL
 
