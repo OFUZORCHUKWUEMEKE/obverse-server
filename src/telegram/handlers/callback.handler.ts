@@ -6,6 +6,7 @@ import { MessageHandler } from './mesage-handler';
 import { PaymentLinkRepository } from 'src/payment-link/payment-repository';
 import { Types } from 'mongoose';
 import { WalletRepository } from 'src/wallet/wallet.repository';
+import { MastraService } from 'src/mastra/mastra.service';
 
 @Injectable()
 export class CallbackHandler {
@@ -19,7 +20,8 @@ export class CallbackHandler {
     private messageHandler: MessageHandler,
     private paymentLinkRepository: PaymentLinkRepository,
     private walletRepository: WalletRepository,
-  ) { }
+    private mastraService: MastraService,
+  ) {}
 
   async handleCallback(callbackQuery: TelegramBot.CallbackQuery) {
     const chatId = callbackQuery.message?.chat.id;
@@ -78,6 +80,10 @@ export class CallbackHandler {
           await this.handlePaymentConfirmNo(chatId, userId);
         } else if (data === 'create_payment') {
           await this.handleCreatePaymentCallback(chatId, userId);
+        } else if (data.startsWith('confirm_send_')) {
+          await this.handleConfirmTransfer(chatId, userId, data);
+        } else if (data === 'cancel_send') {
+          await this.handleCancelTransfer(chatId, userId);
         } else {
           await this.telegramBotService.sendMessage(
             chatId,
@@ -228,7 +234,24 @@ export class CallbackHandler {
   private async handleSendCallback(chatId: number, userId: string) {
     await this.telegramBotService.sendMessage(
       chatId,
-      '💸 Send feature coming soon!\n\n(Send functionality will be implemented)',
+      `💸 <b>Send Tokens</b>\n\n` +
+        `<b>Usage:</b> <code>/send &lt;amount&gt; &lt;token&gt; &lt;address&gt; [memo]</code>\n\n` +
+        `<b>Examples:</b>\n` +
+        `• <code>/send 10 USDC 0x123...abc</code>\n` +
+        `• <code>/send 0.5 MNT 0x456...def Payment for coffee</code>\n` +
+        `• <code>/send 100 USDT 0x789...ghi Monthly subscription</code>\n\n` +
+        `<b>Supported tokens:</b> MNT, USDC, USDT, DAI\n\n` +
+        `<i>Note: The address must be a valid Ethereum address</i>`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '💰 Check Balance First', callback_data: 'balance' },
+              { text: '📊 View Transactions', callback_data: 'transactions' },
+            ],
+          ],
+        },
+      },
     );
   }
 
@@ -258,7 +281,7 @@ export class CallbackHandler {
     await this.telegramBotService.sendMessage(
       chatId,
       `📋 <b>Wallet Address</b>\n\n<code>${address}</code>\n\n` +
-      `<i>Tap to copy the address above</i>`,
+        `<i>Tap to copy the address above</i>`,
     );
   }
 
@@ -277,7 +300,7 @@ export class CallbackHandler {
       await this.telegramBotService.sendMessage(
         chatId,
         `📋 <b>Payment Link</b>\n\n<code>${paymentLink.linkUrl}</code>\n\n` +
-        `<i>Tap to copy the link above, or use the button below to open it.</i>`,
+          `<i>Tap to copy the link above, or use the button below to open it.</i>`,
         {
           reply_markup: {
             inline_keyboard: [
@@ -331,8 +354,8 @@ export class CallbackHandler {
       const detailsList =
         paymentLink.details && Object.keys(paymentLink.details).length > 0
           ? Object.keys(paymentLink.details)
-            .map((field, index) => `  ${index + 1}. ${field}`)
-            .join('\n')
+              .map((field, index) => `  ${index + 1}. ${field}`)
+              .join('\n')
           : '  No details to collect';
 
       // Format payment info
@@ -454,5 +477,95 @@ export class CallbackHandler {
   private async handleCreatePaymentCallback(chatId: number, userId: string) {
     // Start new payment creation flow
     await this.messageHandler.handlePaymentCommand(chatId, userId, []);
+  }
+
+  private async handleConfirmTransfer(
+    chatId: number,
+    userId: string,
+    data: string,
+  ) {
+    try {
+      // Parse callback data: confirm_send_<amount>_<token>_<address>_<memo>
+      const parts = data.replace('confirm_send_', '').split('_');
+
+      if (parts.length < 3) {
+        await this.telegramBotService.sendMessage(
+          chatId,
+          '❌ Invalid transfer data. Please try again.',
+        );
+        return;
+      }
+
+      const amount = parts[0];
+      const token = parts[1];
+      const toAddress = parts[2];
+      const memo = parts[3] ? decodeURIComponent(parts[3]) : '';
+
+      // Send processing message
+      await this.telegramBotService.sendMessage(
+        chatId,
+        `⏳ <b>Processing Transfer...</b>\n\n` +
+          `💸 Sending ${amount} ${token} to <code>${toAddress}</code>\n\n` +
+          `⚠️ Please wait, this may take a few moments...`,
+      );
+
+      // Execute the transfer using Mastra service
+      const result = await this.mastraService.sendTokens(
+        userId,
+        toAddress,
+        amount,
+        token as 'MNT' | 'USDC' | 'USDT' | 'DAI',
+        memo,
+      );
+
+      // Send the result
+      await this.telegramBotService.sendMessage(chatId, result, {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '💰 Check Balance', callback_data: 'balance' },
+              { text: '📊 Transactions', callback_data: 'transactions' },
+            ],
+            [{ text: '💸 Send Again', callback_data: 'send' }],
+          ],
+        },
+      });
+    } catch (error) {
+      this.logger.error('Error handling transfer confirmation:', error);
+
+      await this.telegramBotService.sendMessage(
+        chatId,
+        `❌ <b>Transfer Failed</b>\n\n` +
+          `An error occurred while processing your transfer. Please try again later.\n\n` +
+          `Error: ${error.message}`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '💰 Check Balance', callback_data: 'balance' },
+                { text: '🔄 Try Again', callback_data: 'send' },
+              ],
+            ],
+          },
+        },
+      );
+    }
+  }
+
+  private async handleCancelTransfer(chatId: number, userId: string) {
+    await this.telegramBotService.sendMessage(
+      chatId,
+      '❌ Transfer cancelled.\n\nNo tokens were sent.',
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '💰 Check Balance', callback_data: 'balance' },
+              { text: '💸 Send Tokens', callback_data: 'send' },
+            ],
+          ],
+        },
+      },
+    );
   }
 }

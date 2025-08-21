@@ -6,35 +6,37 @@ import { CreateTransactionDto } from './dto/create-transaction.dto';
 
 @Injectable()
 export class TransactionService {
-    constructor(
-        @InjectModel(Transaction.name)
-        private transactionModel: Model<TransactionDocument>,
-    ) { }
+  constructor(
+    @InjectModel(Transaction.name)
+    private transactionModel: Model<TransactionDocument>,
+  ) {}
 
-    async create(createTransactionDto: CreateTransactionDto): Promise<TransactionDocument> {
-        const transactionData = {
-            ...createTransactionDto,
-            walletId: new Types.ObjectId(createTransactionDto.walletId),
-            userId: new Types.ObjectId(createTransactionDto.userId),
-            paymentLinkId: createTransactionDto.paymentLinkId
-                ? new Types.ObjectId(createTransactionDto.paymentLinkId)
-                : undefined,
-        };
+  async create(
+    createTransactionDto: CreateTransactionDto,
+  ): Promise<TransactionDocument> {
+    const transactionData = {
+      ...createTransactionDto,
+      walletId: new Types.ObjectId(createTransactionDto.walletId),
+      userId: new Types.ObjectId(createTransactionDto.userId),
+      paymentLinkId: createTransactionDto.paymentLinkId
+        ? new Types.ObjectId(createTransactionDto.paymentLinkId)
+        : undefined,
+    };
 
-        const transaction = new this.transactionModel(transactionData);
-        return transaction.save();
+    const transaction = new this.transactionModel(transactionData);
+    return transaction.save();
+  }
+
+  async findById(id: string): Promise<TransactionDocument> {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new NotFoundException('Invalid transaction ID');
     }
 
-    async findById(id: string): Promise<TransactionDocument> {
-        if (!Types.ObjectId.isValid(id)) {
-            throw new NotFoundException('Invalid transaction ID');
-        }
-
-        const transaction = await this.transactionModel.findById(id).exec();
-        if (!transaction) {
-            throw new NotFoundException('Transaction not found');
-        }
-
-        return transaction;
+    const transaction = await this.transactionModel.findById(id).exec();
+    if (!transaction) {
+      throw new NotFoundException('Transaction not found');
     }
+
+    return transaction;
+  }
 }

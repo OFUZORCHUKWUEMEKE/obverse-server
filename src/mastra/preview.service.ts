@@ -1,5 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PaymentLinkImageGenerator, PaymentPreviewData } from './tools/image-generator';
+import {
+  PaymentLinkImageGenerator,
+  PaymentPreviewData,
+} from './tools/image-generator';
 
 @Injectable()
 export class PreviewService {
@@ -8,9 +11,10 @@ export class PreviewService {
   async generatePaymentPreview(data: PaymentPreviewData): Promise<string> {
     try {
       this.logger.log(`Generating preview image for payment: ${data.name}`);
-      
-      const previewImage = await PaymentLinkImageGenerator.generatePaymentPreview(data);
-      
+
+      const previewImage =
+        await PaymentLinkImageGenerator.generatePaymentPreview(data);
+
       this.logger.log(`Preview image generated successfully for: ${data.name}`);
       return previewImage;
     } catch (error) {
@@ -20,9 +24,9 @@ export class PreviewService {
   }
 
   async generateOpenGraphMetaTags(
-    linkUrl: string, 
-    data: PaymentPreviewData, 
-    previewImageUrl?: string
+    linkUrl: string,
+    data: PaymentPreviewData,
+    previewImageUrl?: string,
   ): Promise<string> {
     const title = `Payment Request: ${data.name}`;
     const description = `Pay ${data.amount} ${data.token} - Secure cryptocurrency payment via Mantle Network`;
@@ -53,13 +57,17 @@ export class PreviewService {
   }
 
   generatePaymentPageHTML(
-    linkUrl: string, 
-    data: PaymentPreviewData, 
+    linkUrl: string,
+    data: PaymentPreviewData,
     previewImageUrl?: string,
-    qrCodeDataUrl?: string
+    qrCodeDataUrl?: string,
   ): string {
-    const metaTags = this.generateOpenGraphMetaTags(linkUrl, data, previewImageUrl);
-    
+    const metaTags = this.generateOpenGraphMetaTags(
+      linkUrl,
+      data,
+      previewImageUrl,
+    );
+
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -168,24 +176,32 @@ export class PreviewService {
             <span class="token-badge ${data.token.toLowerCase()}">${data.token}</span>
         </div>
         
-        ${qrCodeDataUrl ? `
+        ${
+          qrCodeDataUrl
+            ? `
         <div class="qr-section">
             <h3>📱 Scan to Pay</h3>
             <img src="${qrCodeDataUrl}" alt="QR Code" class="qr-code" />
             <p>Scan this QR code with your crypto wallet to make the payment</p>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
         
         <button class="pay-button" onclick="connectWallet()">
             🚀 Pay with Crypto Wallet
         </button>
         
-        ${data.walletAddress ? `
+        ${
+          data.walletAddress
+            ? `
         <div class="wallet-info">
             <strong>Recipient Wallet:</strong><br>
             <code>${data.walletAddress}</code>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
         
         <div class="wallet-info">
             <strong>🔒 Secure Payment</strong><br>

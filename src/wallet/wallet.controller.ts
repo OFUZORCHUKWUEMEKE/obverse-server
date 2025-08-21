@@ -14,7 +14,7 @@ import { WalletBalanceResponseDto } from './dto/balance.dto';
 export class WalletController {
   private readonly logger = new Logger(WalletController.name);
 
-  constructor(private readonly walletService: WalletService) { }
+  constructor(private readonly walletService: WalletService) {}
 
   @Get('balance/:address')
   @ApiOperation({ summary: 'Get wallet balance by address' })

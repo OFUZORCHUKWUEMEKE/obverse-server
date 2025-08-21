@@ -7,7 +7,7 @@ import { TransactionRepository } from 'src/transaction/transacton.repository';
 export class PaymentLinkService {
   constructor(
     private readonly paymentLinkRepository: PaymentLinkRepository,
-    private readonly transactionRepository: TransactionRepository
+    private readonly transactionRepository: TransactionRepository,
   ) {}
 
   async getPaymentLinkByLinkId(linkId: string): Promise<PaymentLinkDocument> {
@@ -21,20 +21,24 @@ export class PaymentLinkService {
   }
 
   async getPaymentLinkWithTransactions(linkId: string) {
-    const paymentLink = await this.paymentLinkRepository.model().findOne({ linkId }).exec();
+    const paymentLink = await this.paymentLinkRepository
+      .model()
+      .findOne({ linkId })
+      .exec();
 
     if (!paymentLink) {
       throw new NotFoundException('Payment link not found');
     }
 
-    const transactions = await this.transactionRepository.model()
+    const transactions = await this.transactionRepository
+      .model()
       .find({ paymentLinkId: paymentLink._id })
       .sort({ createdAt: -1 })
       .exec();
 
     return {
       paymentLink,
-      transactions
+      transactions,
     };
   }
 }

@@ -4,7 +4,7 @@ import { PaymentLinkDocument } from './payment-link.model';
 
 @Controller('payment-link')
 export class PaymentLinkController {
-  constructor(private readonly paymentLinkService: PaymentLinkService) { }
+  constructor(private readonly paymentLinkService: PaymentLinkService) {}
 
   @Get(':linkId')
   async getPaymentLink(
@@ -14,9 +14,7 @@ export class PaymentLinkController {
   }
 
   @Post(':linkId/transactions')
-  async getPaymentLinkWithTransaction(
-    @Param('linkId') linkId: string,
-  ) {
+  async getPaymentLinkWithTransaction(@Param('linkId') linkId: string) {
     return await this.paymentLinkService.getPaymentLinkWithTransactions(linkId);
   }
 }

@@ -5,11 +5,18 @@ import { WalletModule } from 'src/wallet/wallet.module';
 import { ParaModule } from 'src/para/para.module';
 import { PaymentLinkModule } from 'src/payment-link/payment-link.module';
 import { UsersModule } from 'src/users/users.module';
+import { TransactionModule } from 'src/transaction/transaction.module';
 
 @Module({
-  imports: [WalletModule, ParaModule, PaymentLinkModule, UsersModule],
+  imports: [
+    WalletModule,
+    ParaModule,
+    PaymentLinkModule,
+    UsersModule,
+    TransactionModule,
+  ],
   providers: [McpService],
   controllers: [McpController],
   exports: [McpService],
 })
-export class McpModule { }
+export class McpModule {}

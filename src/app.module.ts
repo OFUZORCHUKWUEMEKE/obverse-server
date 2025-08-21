@@ -55,4 +55,4 @@ const config = configuration();
   controllers: [AppController, MastraController],
   providers: [AppService, MastraService],
 })
-export class AppModule { }
+export class AppModule {}

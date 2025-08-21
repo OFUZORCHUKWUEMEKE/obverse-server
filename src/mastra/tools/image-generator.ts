@@ -19,7 +19,7 @@ export class PaymentLinkImageGenerator {
     warning: '#f59e0b',
     text: '#ffffff',
     textSecondary: '#9ca3af',
-    accent: '#6366f1'
+    accent: '#6366f1',
   };
 
   private static getTokenColor(token: string): string {
@@ -48,7 +48,9 @@ export class PaymentLinkImageGenerator {
     }
   }
 
-  static async generatePaymentPreview(data: PaymentPreviewData): Promise<string> {
+  static async generatePaymentPreview(
+    data: PaymentPreviewData,
+  ): Promise<string> {
     // Generate SVG-based preview image that can be converted to PNG or used directly
     return this.generateSimplePreview(data);
   }
@@ -59,7 +61,9 @@ export class PaymentLinkImageGenerator {
   }
 
   // Alternative method using HTML Canvas API for server-side rendering
-  static async generateSimplePreview(data: PaymentPreviewData): Promise<string> {
+  static async generateSimplePreview(
+    data: PaymentPreviewData,
+  ): Promise<string> {
     // Return a data URL for a simple SVG-based preview image
     const svg = `
       <svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">

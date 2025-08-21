@@ -3,12 +3,14 @@ import { WalletRepository } from 'src/wallet/wallet.repository';
 import { ParaService } from 'src/para/para.service';
 import { PaymentLinkRepository } from 'src/payment-link/payment-repository';
 import { UserRepository } from 'src/users/user-repository';
+import { TransactionRepository } from 'src/transaction/transacton.repository';
 import {
   PaymentLinkType,
   PaymentLinkStatus,
 } from 'src/payment-link/payment-link.model';
 import { BlockchainNetwork } from 'src/wallet/wallet.model';
 import * as QRCode from 'qrcode';
+import { createTransferTool } from 'src/mastra/tools/transfer-tool';
 
 export interface McpTool {
   name: string;
@@ -30,11 +32,13 @@ export interface McpToolResult {
   isInteractive?: boolean;
   nextStep?: string;
   sessionId?: string;
-  buttons?: Array<Array<{
-    text: string;
-    data?: string;
-    url?: string;
-  }>>;
+  buttons?: Array<
+    Array<{
+      text: string;
+      data?: string;
+      url?: string;
+    }>
+  >;
 }
 
 interface PaymentLinkCreationState {
@@ -50,13 +54,22 @@ interface PaymentLinkCreationState {
 export class McpService {
   private readonly logger = new Logger(McpService.name);
   private paymentCreationStates = new Map<string, PaymentLinkCreationState>();
+  private transferTool: any;
 
   constructor(
     private readonly walletRepository: WalletRepository,
     private readonly paraService: ParaService,
     private readonly paymentLinkRepository: PaymentLinkRepository,
     private readonly userRepository: UserRepository,
-  ) { }
+    private readonly transactionRepository: TransactionRepository,
+  ) {
+    this.transferTool = createTransferTool(
+      this.walletRepository,
+      this.userRepository,
+      this.transactionRepository,
+      this.paraService,
+    );
+  }
 
   async listTools(): Promise<McpTool[]> {
     return [
@@ -92,8 +105,7 @@ export class McpService {
       },
       {
         name: 'cancel_payment_creation',
-        description:
-          'Cancel the current payment link creation process',
+        description: 'Cancel the current payment link creation process',
         inputSchema: {
           type: 'object',
           properties: {
@@ -103,6 +115,39 @@ export class McpService {
             },
           },
           required: ['userId'],
+        },
+      },
+      {
+        name: 'transfer_tokens',
+        description:
+          'Transfer MNT or stablecoins (USDC, USDT, DAI) to another address',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            userId: {
+              type: 'string',
+              description: 'The telegram user ID of the sender',
+            },
+            toAddress: {
+              type: 'string',
+              description:
+                'Destination wallet address (must be valid Ethereum address)',
+            },
+            amount: {
+              type: 'string',
+              description: 'Amount to transfer (e.g., "10.5", "100")',
+            },
+            token: {
+              type: 'string',
+              enum: ['MNT', 'USDC', 'USDT', 'DAI'],
+              description: 'Token type to transfer',
+            },
+            memo: {
+              type: 'string',
+              description: 'Optional memo/note for the transaction',
+            },
+          },
+          required: ['userId', 'toAddress', 'amount', 'token'],
         },
       },
     ];
@@ -118,6 +163,14 @@ export class McpService {
         return this.startPaymentLinkCreation(args.userId);
       case 'cancel_payment_creation':
         return this.cancelPaymentCreation(args.userId);
+      case 'transfer_tokens':
+        return this.transferTokens(
+          args.userId,
+          args.toAddress,
+          args.amount,
+          args.token,
+          args.memo,
+        );
       default:
         return {
           content: [
@@ -229,9 +282,7 @@ export class McpService {
         isInteractive: true,
         nextStep: 'name',
         sessionId: userId,
-        buttons: [
-          [{ text: '❌ Cancel', data: 'cancel' }],
-        ],
+        buttons: [[{ text: '❌ Cancel', data: 'cancel' }]],
       };
     } catch (error) {
       this.logger.error('Error starting payment link creation:', error);
@@ -533,8 +584,8 @@ export class McpService {
     const detailsList =
       state.details && Object.keys(state.details).length > 0
         ? Object.keys(state.details)
-          .map((field, index) => `  ${index + 1}. ${field}`)
-          .join('\n')
+            .map((field, index) => `  ${index + 1}. ${field}`)
+            .join('\n')
         : '  (No details to collect)';
 
     return {
@@ -673,8 +724,8 @@ export class McpService {
       const detailsList =
         state.details && Object.keys(state.details).length > 0
           ? Object.keys(state.details)
-            .map((field, index) => `  ${index + 1}. ${field}`)
-            .join('\n')
+              .map((field, index) => `  ${index + 1}. ${field}`)
+              .join('\n')
           : '  (No details to collect)';
 
       // Generate QR code as buffer
@@ -819,6 +870,89 @@ export class McpService {
     return payerDetails;
   }
 
+  private async transferTokens(
+    userId: string,
+    toAddress: string,
+    amount: string,
+    token: string,
+    memo?: string,
+  ): Promise<McpToolResult> {
+    try {
+      this.logger.log(
+        `Processing transfer for user ${userId}: ${amount} ${token} to ${toAddress}`,
+      );
+
+      const transferResult = await this.transferTool.execute({
+        telegramUserId: userId,
+        toAddress,
+        amount,
+        token,
+        memo: memo || '',
+      });
+
+      if (transferResult.success) {
+        const data = transferResult.data;
+        const responseText =
+          `✅ **Transfer Successful!**\n\n` +
+          `💸 **Sent:** ${data.amount} ${data.token}\n` +
+          `📍 **To:** \`${data.toAddress}\`\n` +
+          `📊 **Transaction:** \`${data.transactionHash}\`\n` +
+          `⛽ **Gas Used:** ${data.gasUsed || 'N/A'}\n\n` +
+          `🔗 [View on Explorer](${data.confirmationUrl})`;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: responseText,
+            },
+          ],
+          buttons: [
+            [
+              { text: '🌐 View on Explorer', url: data.confirmationUrl },
+              { text: '💰 Check Balance', data: 'balance' },
+            ],
+            [
+              { text: '💸 Send Again', data: 'send' },
+              { text: '📊 Transactions', data: 'transactions' },
+            ],
+          ],
+        };
+      } else {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `❌ **Transfer Failed**\n\n${transferResult.error}`,
+            },
+          ],
+          buttons: [
+            [
+              { text: '💰 Check Balance', data: 'balance' },
+              { text: '🔄 Try Again', data: 'send' },
+            ],
+          ],
+        };
+      }
+    } catch (error) {
+      this.logger.error('Error processing transfer:', error);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: '❌ **Transfer Error**\n\nFailed to process transfer. Please try again later.',
+          },
+        ],
+        buttons: [
+          [
+            { text: '💰 Check Balance', data: 'balance' },
+            { text: '🔄 Try Again', data: 'send' },
+          ],
+        ],
+      };
+    }
+  }
+
   async processNaturalLanguage(
     message: string,
     userId: string,
@@ -826,7 +960,12 @@ export class McpService {
     const lowerMessage = message.toLowerCase().trim();
 
     // Check if user wants to cancel payment creation
-    if (lowerMessage === 'cancel' || lowerMessage === '/cancel' || lowerMessage === 'quit' || lowerMessage === 'exit') {
+    if (
+      lowerMessage === 'cancel' ||
+      lowerMessage === '/cancel' ||
+      lowerMessage === 'quit' ||
+      lowerMessage === 'exit'
+    ) {
       const paymentState = this.paymentCreationStates.get(userId);
       if (paymentState) {
         this.logger.log(`Cancelling payment creation flow for user ${userId}`);
@@ -838,7 +977,9 @@ export class McpService {
     // Check if user is in payment creation flow first
     const paymentState = this.paymentCreationStates.get(userId);
     if (paymentState) {
-      this.logger.log(`Continuing payment creation flow for user ${userId} at step ${paymentState.step}`);
+      this.logger.log(
+        `Continuing payment creation flow for user ${userId} at step ${paymentState.step}`,
+      );
       const result = await this.continuePaymentCreation(userId, message);
       return result.content[0].text || 'Continuing payment creation...';
     }
@@ -868,7 +1009,9 @@ export class McpService {
     if (balanceKeywords.some((keyword) => lowerMessage.includes(keyword))) {
       this.logger.log(`Processing balance request for user ${userId}`);
       const result = await this.callTool('get_wallet_balance', { userId });
-      return result.content[0].text || 'Unable to retrieve balance information.';
+      return (
+        result.content[0].text || 'Unable to retrieve balance information.'
+      );
     }
 
     if (paymentKeywords.some((keyword) => lowerMessage.includes(keyword))) {

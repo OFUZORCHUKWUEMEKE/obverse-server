@@ -3,7 +3,7 @@ import { McpService, McpTool, McpToolResult } from './mcp.service';
 
 @Controller('mcp')
 export class McpController {
-  constructor(private readonly mcpService: McpService) { }
+  constructor(private readonly mcpService: McpService) {}
 
   @Get('tools')
   async listTools(): Promise<{ tools: McpTool[] }> {

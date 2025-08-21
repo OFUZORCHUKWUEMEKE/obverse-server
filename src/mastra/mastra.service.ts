@@ -5,6 +5,7 @@ import { ParaService } from '../para/para.service';
 import { PaymentLinkRepository } from '../payment-link/payment-repository';
 import { WalletRepository } from '../wallet/wallet.repository';
 import { UserRepository } from '../users/user-repository';
+import { TransactionRepository } from '../transaction/transacton.repository';
 
 @Injectable()
 export class MastraService {
@@ -16,7 +17,8 @@ export class MastraService {
     private paraService: ParaService,
     private paymentLinkRepository: PaymentLinkRepository,
     private walletRepository: WalletRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private transactionRepository: TransactionRepository,
   ) {
     this.initializeAgent();
   }
@@ -28,7 +30,8 @@ export class MastraService {
         this.paraService,
         this.paymentLinkRepository,
         this.walletRepository,
-        this.userRepository
+        this.userRepository,
+        this.transactionRepository,
       );
       this.logger.log('Telegram Crypto Agent initialized successfully');
     } catch (error) {
@@ -40,20 +43,22 @@ export class MastraService {
     message: string,
     telegramUserId: string,
     telegramChatId?: string,
-    context?: any
+    context?: any,
   ): Promise<string> {
     try {
       if (!this.telegramAgent) {
         throw new Error('Telegram agent not initialized');
       }
 
-      this.logger.log(`Processing natural language request from user ${telegramUserId}: "${message}"`);
+      this.logger.log(
+        `Processing natural language request from user ${telegramUserId}: "${message}"`,
+      );
 
       const response = await this.telegramAgent.processMessage(
         message,
         telegramUserId,
         telegramChatId || telegramUserId,
-        context
+        context,
       );
 
       this.logger.log(`Agent response generated for user ${telegramUserId}`);
@@ -65,7 +70,10 @@ export class MastraService {
     }
   }
 
-  async checkUserBalance(telegramUserId: string, tokens?: string[]): Promise<string> {
+  async checkUserBalance(
+    telegramUserId: string,
+    tokens?: string[],
+  ): Promise<string> {
     try {
       if (!this.telegramAgent) {
         throw new Error('Telegram agent not initialized');
@@ -73,7 +81,10 @@ export class MastraService {
 
       this.logger.log(`Checking balance for user ${telegramUserId}`);
 
-      const response = await this.telegramAgent.checkBalance(telegramUserId, tokens);
+      const response = await this.telegramAgent.checkBalance(
+        telegramUserId,
+        tokens,
+      );
 
       this.logger.log(`Balance check completed for user ${telegramUserId}`);
       return response;
@@ -91,7 +102,7 @@ export class MastraService {
       token: 'USDC' | 'USDT' | 'DAI';
       amount: string;
       details?: { [key: string]: string };
-    }
+    },
   ): Promise<string> {
     try {
       if (!this.telegramAgent) {
@@ -103,7 +114,7 @@ export class MastraService {
       const response = await this.telegramAgent.createPaymentLink(
         telegramUserId,
         telegramChatId,
-        params
+        params,
       );
 
       this.logger.log(`Payment link created for user ${telegramUserId}`);
@@ -111,6 +122,38 @@ export class MastraService {
     } catch (error) {
       this.logger.error('Error creating payment link:', error);
       throw new Error(`Payment link creation error: ${error.message}`);
+    }
+  }
+
+  async sendTokens(
+    telegramUserId: string,
+    toAddress: string,
+    amount: string,
+    token: 'MNT' | 'USDC' | 'USDT' | 'DAI',
+    memo?: string,
+  ): Promise<string> {
+    try {
+      if (!this.telegramAgent) {
+        throw new Error('Telegram agent not initialized');
+      }
+
+      this.logger.log(
+        `Processing transfer for user ${telegramUserId}: ${amount} ${token} to ${toAddress}`,
+      );
+
+      const response = await this.telegramAgent.sendTokens(
+        telegramUserId,
+        toAddress,
+        amount,
+        token,
+        memo,
+      );
+
+      this.logger.log(`Transfer processed for user ${telegramUserId}`);
+      return response;
+    } catch (error) {
+      this.logger.error('Error processing transfer:', error);
+      throw new Error(`Transfer error: ${error.message}`);
     }
   }
 

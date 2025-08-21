@@ -11,34 +11,34 @@ const mockWalletService = {
         return {
           _id: 'wallet_id_123',
           address: '0x1234567890abcdef1234567890abcdef12345678',
-          userId: 'test_user_123'
+          userId: 'test_user_123',
         };
       }
       return null;
-    }
-  }
+    },
+  },
 };
 
 const mockParaService = {
   getBalance: async (address: string) => ({
-    balance: '1.5'
+    balance: '1.5',
   }),
   getMantleBalance: async (address: string) => ({
     formatted: '100.0',
-    symbol: 'MNT'
+    symbol: 'MNT',
   }),
   getAllTokenBalances: async (address: string) => [
     { symbol: 'USDC', balance: '500.123456', address: '0xusdc' },
     { symbol: 'USDT', balance: '250.789012', address: '0xusdt' },
-    { symbol: 'DAI', balance: '75.345678', address: '0xdai' }
-  ]
+    { symbol: 'DAI', balance: '75.345678', address: '0xdai' },
+  ],
 };
 
 const mockPaymentLinkRepository = {
   create: async (data: any) => ({
     _id: 'payment_link_123',
-    ...data
-  })
+    ...data,
+  }),
 };
 
 const mockUserRepository = {
@@ -48,22 +48,22 @@ const mockUserRepository = {
         _id: 'user_id_123',
         telegramId: 'test_user_123',
         firstName: 'Test',
-        lastName: 'User'
+        lastName: 'User',
       };
     }
     return null;
-  }
+  },
 };
 
 export async function testAgent() {
   console.log('🤖 Initializing Telegram Crypto Agent...');
-  
+
   const agent = new TelegramCryptoAgent(
     mockWalletService,
     mockParaService,
     mockPaymentLinkRepository,
     mockWalletService.walletRepository,
-    mockUserRepository
+    mockUserRepository,
   );
 
   console.log('✅ Agent initialized successfully');
@@ -86,7 +86,7 @@ export async function testAgent() {
       'Test Coffee Purchase',
       'USDC',
       '5.50',
-      { name: '', email: '', phone: '' }
+      { name: '', email: '', phone: '' },
     );
     console.log('Payment link result:', JSON.stringify(paymentResult, null, 2));
   } catch (error) {
@@ -99,7 +99,7 @@ export async function testAgent() {
     const naturalResponse = await agent.processMessage(
       'What is my current wallet balance?',
       'test_user_123',
-      'test_chat_123'
+      'test_chat_123',
     );
     console.log('Natural language response:', naturalResponse);
   } catch (error) {

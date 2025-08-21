@@ -1,4 +1,10 @@
-import { IsString, IsEnum, IsOptional, IsBoolean, IsObject } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsBoolean,
+  IsObject,
+} from 'class-validator';
 import { Types } from 'mongoose';
 import { TransactionType } from '../transaction.model';
 import { BlockchainNetwork } from 'src/wallet/wallet.model';

@@ -30,8 +30,9 @@ export class MastraController {
         walletAddress: paymentLink.creatorWalletId?.toString(),
       };
 
-      const svgImage = await this.previewService.generatePaymentPreview(previewData);
-      
+      const svgImage =
+        await this.previewService.generatePaymentPreview(previewData);
+
       // Convert data URL to buffer if needed, or serve SVG directly
       if (svgImage.startsWith('data:image/svg+xml;base64,')) {
         const svgBuffer = Buffer.from(svgImage.split(',')[1], 'base64');
@@ -49,10 +50,7 @@ export class MastraController {
   }
 
   @Get('payment/:linkId')
-  async getPaymentPage(
-    @Param('linkId') linkId: string,
-    @Res() res: Response,
-  ) {
+  async getPaymentPage(@Param('linkId') linkId: string, @Res() res: Response) {
     try {
       // Find payment link
       const paymentLink = await this.paymentLinkRepository.findOne({ linkId });
@@ -70,7 +68,7 @@ export class MastraController {
 
       // Generate preview image URL
       const previewImageUrl = `${process.env.BASE_URL || 'https://your-domain.com'}/preview/payment/${linkId}/image`;
-      
+
       // Generate payment page HTML
       const html = this.previewService.generatePaymentPageHTML(
         paymentLink.linkUrl,
@@ -96,8 +94,9 @@ export class MastraController {
       walletAddress: '0x1234567890abcdef1234567890abcdef12345678',
     };
 
-    const previewImage = await this.previewService.generatePaymentPreview(testData);
-    
+    const previewImage =
+      await this.previewService.generatePaymentPreview(testData);
+
     return {
       linkId,
       previewImage,

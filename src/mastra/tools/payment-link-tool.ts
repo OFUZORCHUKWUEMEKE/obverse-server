@@ -1,26 +1,35 @@
-import { Tool } from "@mastra/core";
-import { z } from "zod";
-import { PaymentLinkType, PaymentLinkStatus } from "../../payment-link/payment-link.model";
-import { BlockchainNetwork } from "../../wallet/wallet.model";
+import { Tool } from '@mastra/core';
+import { z } from 'zod';
+import {
+  PaymentLinkType,
+  PaymentLinkStatus,
+} from '../../payment-link/payment-link.model';
+import { BlockchainNetwork } from '../../wallet/wallet.model';
 import * as QRCode from 'qrcode';
 // Preview image generation is handled by the controller endpoint
 
 export const createPaymentLinkTool = (
   paymentLinkRepository: any,
   walletRepository: any,
-  userRepository: any
+  userRepository: any,
 ) => {
   return new Tool({
-    id: "create_payment_links",
-    description: "Create payment links for cryptocurrency payments",
+    id: 'create_payment_links',
+    description: 'Create payment links for cryptocurrency payments',
     inputSchema: z.object({
-      telegramUserId: z.string().describe("Telegram user ID of the creator"),
-      telegramChatId: z.string().describe("Telegram chat ID for notifications"),
-      name: z.string().describe("Payment name/title"),
-      token: z.enum(['USDC', 'USDT', 'DAI']).describe("Token type for payment"),
-      amount: z.string().describe("Payment amount"),
-      details: z.record(z.string()).optional().describe("Additional details to collect from payers"),
-      type: z.enum(['ONE_TIME', 'RECURRING']).default('ONE_TIME').describe("Payment link type")
+      telegramUserId: z.string().describe('Telegram user ID of the creator'),
+      telegramChatId: z.string().describe('Telegram chat ID for notifications'),
+      name: z.string().describe('Payment name/title'),
+      token: z.enum(['USDC', 'USDT', 'DAI']).describe('Token type for payment'),
+      amount: z.string().describe('Payment amount'),
+      details: z
+        .record(z.string())
+        .optional()
+        .describe('Additional details to collect from payers'),
+      type: z
+        .enum(['ONE_TIME', 'RECURRING'])
+        .default('ONE_TIME')
+        .describe('Payment link type'),
     }),
     execute: async (params: any) => {
       const {
@@ -30,18 +39,22 @@ export const createPaymentLinkTool = (
         token,
         amount,
         details = {},
-        type = 'ONE_TIME'
+        type = 'ONE_TIME',
       } = params;
       try {
         // Get user and wallet
-        const user = await userRepository.findOne({ telegramId: telegramUserId });
-        const wallet = await walletRepository.findOne({ userId: telegramUserId });
+        const user = await userRepository.findOne({
+          telegramId: telegramUserId,
+        });
+        const wallet = await walletRepository.findOne({
+          userId: telegramUserId,
+        });
 
         if (!user || !wallet) {
           return {
             success: false,
-            error: "User or wallet not found",
-            data: null
+            error: 'User or wallet not found',
+            data: null,
           };
         }
 
@@ -111,22 +124,23 @@ export const createPaymentLinkTool = (
             amount,
             details,
             createdAt: new Date().toISOString(),
-            status: 'ACTIVE'
-          }
+            status: 'ACTIVE',
+          },
         };
       } catch (error) {
         return {
           success: false,
           error: `Failed to create payment link: ${error.message}`,
-          data: null
+          data: null,
         };
       }
-    }
+    },
   });
 };
 
 function generateLinkId(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const chars =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
   for (let i = 0; i < 8; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -134,7 +148,9 @@ function generateLinkId(): string {
   return result;
 }
 
-function convertDetailsToPayerDetails(details?: { [key: string]: string }): { [key: string]: any } | undefined {
+function convertDetailsToPayerDetails(details?: {
+  [key: string]: string;
+}): { [key: string]: any } | undefined {
   if (!details || Object.keys(details).length === 0) {
     return undefined;
   }
