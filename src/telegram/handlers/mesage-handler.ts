@@ -911,6 +911,7 @@ export class MessageHandler {
   ) {
     try {
       const wallet = await this.walletRepository.findOne({ userId });
+      // console.log(wallet);
       const user = await this.userRepository.findOne({ telegramId: userId });
 
       if (!wallet || !user) {

@@ -46,7 +46,7 @@ export class TelegramCryptoAgent {
       return "🔗 I can help you create payment links! Please use the /payment command to start the payment link creation process.";
     }
 
-    return "👋 I'm your crypto wallet assistant! I can help you:\n\n💰 Check wallet balances - just ask \"what's my balance?\"\n🔗 Create payment links - use /payment command\n📊 View transactions - use /transactions command\n\nWhat would you like to do?";
+    return "👋 I'm your assistant! I can help you:\n\n💰 Check wallet balances - just ask \"what's my balance?\"\n🔗 Create payment links - use /payment command\n📊 View transactions - use /transactions command\n\nWhat would you like to do?";
   }
 
   async checkBalance(telegramUserId: string, tokens?: string[]): Promise<string> {

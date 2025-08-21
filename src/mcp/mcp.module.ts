@@ -12,4 +12,4 @@ import { UsersModule } from 'src/users/users.module';
   controllers: [McpController],
   exports: [McpService],
 })
-export class McpModule {}
+export class McpModule { }

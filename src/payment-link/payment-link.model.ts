@@ -86,14 +86,6 @@ export class PaymentLink {
 
   @Prop([
     {
-      type: Types.ObjectId,
-      ref: 'Transaction',
-    },
-  ])
-  transactions: Types.ObjectId[]; // Associated transactions
-
-  @Prop([
-    {
       payerAddress: String,
       amount: String,
       transactionHash: String,

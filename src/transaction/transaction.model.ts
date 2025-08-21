@@ -39,7 +39,7 @@ export class Transaction {
   hash?: string; // Blockchain transaction hash
 
   @Prop({ required: true })
-  amount: string; // Amount in wei/smallest unit
+  amount: string; // Amount in USD
 
   @Prop({ required: true })
   token: string; // Token symbol (USDC, USDT, etc.)
@@ -92,10 +92,6 @@ export class Transaction {
   @Prop()
   telegramChatId?: string;
 
-  // Transaction metadata
-  @Prop()
-  description?: string;
-
   @Prop()
   memo?: string;
 
@@ -110,6 +106,9 @@ export class Transaction {
     initiatedBy?: 'user' | 'agent' | 'system';
     [key: string]: any;
   };
+
+  @Prop({ type: Object })
+  payerDetails?: { [key: string]: any };
 
   // Error information if failed
   @Prop()

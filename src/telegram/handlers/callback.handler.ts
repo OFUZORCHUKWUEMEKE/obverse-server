@@ -19,7 +19,7 @@ export class CallbackHandler {
     private messageHandler: MessageHandler,
     private paymentLinkRepository: PaymentLinkRepository,
     private walletRepository: WalletRepository,
-  ) {}
+  ) { }
 
   async handleCallback(callbackQuery: TelegramBot.CallbackQuery) {
     const chatId = callbackQuery.message?.chat.id;
@@ -258,7 +258,7 @@ export class CallbackHandler {
     await this.telegramBotService.sendMessage(
       chatId,
       `📋 <b>Wallet Address</b>\n\n<code>${address}</code>\n\n` +
-        `<i>Tap to copy the address above</i>`,
+      `<i>Tap to copy the address above</i>`,
     );
   }
 
@@ -277,7 +277,7 @@ export class CallbackHandler {
       await this.telegramBotService.sendMessage(
         chatId,
         `📋 <b>Payment Link</b>\n\n<code>${paymentLink.linkUrl}</code>\n\n` +
-          `<i>Tap to copy the link above, or use the button below to open it.</i>`,
+        `<i>Tap to copy the link above, or use the button below to open it.</i>`,
         {
           reply_markup: {
             inline_keyboard: [
@@ -331,8 +331,8 @@ export class CallbackHandler {
       const detailsList =
         paymentLink.details && Object.keys(paymentLink.details).length > 0
           ? Object.keys(paymentLink.details)
-              .map((field, index) => `  ${index + 1}. ${field}`)
-              .join('\n')
+            .map((field, index) => `  ${index + 1}. ${field}`)
+            .join('\n')
           : '  No details to collect';
 
       // Format payment info

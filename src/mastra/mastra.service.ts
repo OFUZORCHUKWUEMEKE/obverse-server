@@ -48,7 +48,7 @@ export class MastraService {
       }
 
       this.logger.log(`Processing natural language request from user ${telegramUserId}: "${message}"`);
-      
+
       const response = await this.telegramAgent.processMessage(
         message,
         telegramUserId,
@@ -72,9 +72,9 @@ export class MastraService {
       }
 
       this.logger.log(`Checking balance for user ${telegramUserId}`);
-      
+
       const response = await this.telegramAgent.checkBalance(telegramUserId, tokens);
-      
+
       this.logger.log(`Balance check completed for user ${telegramUserId}`);
       return response;
     } catch (error) {
@@ -99,13 +99,13 @@ export class MastraService {
       }
 
       this.logger.log(`Creating payment link for user ${telegramUserId}`);
-      
+
       const response = await this.telegramAgent.createPaymentLink(
         telegramUserId,
         telegramChatId,
         params
       );
-      
+
       this.logger.log(`Payment link created for user ${telegramUserId}`);
       return response;
     } catch (error) {

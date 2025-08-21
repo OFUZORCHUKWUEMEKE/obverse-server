@@ -15,4 +15,4 @@ import { TransactionRepository } from './transacton.repository';
   providers: [TransactionService, TransactionRepository],
   exports: [TransactionRepository],
 })
-export class TransactionModule {}
+export class TransactionModule { }

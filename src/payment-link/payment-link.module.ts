@@ -5,12 +5,14 @@ import { Mongoose } from 'mongoose';
 import { PaymentLinkSchema } from './payment-link.model';
 import { MongooseModule } from '@nestjs/mongoose';
 import { PaymentLinkRepository } from './payment-repository';
+import { TransactionModule } from 'src/transaction/transaction.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: 'PaymentLink', schema: PaymentLinkSchema },
     ]),
+    TransactionModule,
   ],
   providers: [PaymentLinkService, PaymentLinkRepository],
   controllers: [PaymentLinkController],
