@@ -4,6 +4,8 @@
 
 Obverse is an intelligent payment assistant that simplifies cryptocurrency transactions for merchants. Built as a Telegram bot, it enables seamless payment collection through shareable links and QR codes, making crypto payments as easy as traditional payment methods.
 
+![Screenshot](images/OBVERSE%203.jpg)
+
 ## 🌟 Features
 
 ### 💰 Wallet Management
@@ -39,6 +41,8 @@ Obverse is an intelligent payment assistant that simplifies cryptocurrency trans
 - **Telegram**: node-telegram-bot-api
 - **AI Framework**: Mastra for intelligent agent capabilities
 - **Smart Contracts**: ethers.js and viem for blockchain interactions
+
+![Screenshot](images/OBVERSE%20.jpg)
 
 ## 🚀 Getting Started
 
