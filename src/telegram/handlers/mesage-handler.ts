@@ -38,7 +38,7 @@ export class MessageHandler {
     private paymentLinkRepository: PaymentLinkRepository,
     private mcpService: McpService,
     private mastraService: MastraService,
-  ) {}
+  ) { }
 
   async handleMessage(msg: TelegramBot.Message) {
     const chatId = msg.chat.id;
@@ -575,13 +575,13 @@ export class MessageHandler {
         await this.telegramService.sendMessage(
           chatId,
           `💸 <b>Send Tokens</b>\n\n` +
-            `<b>Usage:</b> <code>/send &lt;amount&gt; &lt;token&gt; &lt;address&gt; [memo]</code>\n\n` +
-            `<b>Examples:</b>\n` +
-            `• <code>/send 10 USDC 0x123...abc</code>\n` +
-            `• <code>/send 0.5 MNT 0x456...def Payment for coffee</code>\n` +
-            `• <code>/send 100 USDT 0x789...ghi Monthly subscription</code>\n\n` +
-            `<b>Supported tokens:</b> MNT, USDC, USDT, DAI\n\n` +
-            `<i>Note: The address must be a valid Ethereum address</i>`,
+          `<b>Usage:</b> <code>/send &lt;amount&gt; &lt;token&gt; &lt;address&gt; [memo]</code>\n\n` +
+          `<b>Examples:</b>\n` +
+          `• <code>/send 10 USDC 0x123...abc</code>\n` +
+          `• <code>/send 0.5 MNT 0x456...def Payment for coffee</code>\n` +
+          `• <code>/send 100 USDT 0x789...ghi Monthly subscription</code>\n\n` +
+          `<b>Supported tokens:</b> MNT, USDC, USDT, DAI\n\n` +
+          `<i>Note: The address must be a valid Ethereum address</i>`,
           {
             reply_markup: {
               inline_keyboard: [
@@ -684,10 +684,10 @@ export class MessageHandler {
       await this.telegramService.sendMessage(
         chatId,
         `🔗 <b>Create Payment Link</b>\n\n` +
-          `Let's create a payment link for your business!\n\n` +
-          `<b>Step 1 of 4:</b> What would you like to name this payment?\n\n` +
-          `<i>Example: "Coffee Shop Order", "Service Payment", "Product Purchase"</i>\n\n` +
-          `Type <code>/cancel</code> to cancel anytime.`,
+        `Let's create a payment link for your business!\n\n` +
+        `<b>Step 1 of 4:</b> What would you like to name this payment?\n\n` +
+        `<i>Example: "Coffee Shop Order", "Service Payment", "Product Purchase"</i>\n\n` +
+        `Type <code>/cancel</code> to cancel anytime.`,
       );
     } catch (error) {
       this.logger.error('Error in payment command:', error);
@@ -790,8 +790,8 @@ export class MessageHandler {
     await this.telegramService.sendMessage(
       chatId,
       `✅ Payment name set: <b>${text}</b>\n\n` +
-        `<b>Step 2 of 4:</b> Which token would you like to accept?\n\n` +
-        `Please choose one of the following:`,
+      `<b>Step 2 of 4:</b> Which token would you like to accept?\n\n` +
+      `Please choose one of the following:`,
       {
         reply_markup: {
           inline_keyboard: [
@@ -834,9 +834,9 @@ export class MessageHandler {
     await this.telegramService.sendMessage(
       chatId,
       `✅ Token selected: ${tokenEmoji} <b>${upperText}</b>\n\n` +
-        `<b>Step 3 of 4:</b> What's the amount you want to request?\n\n` +
-        `<i>Example: 10.50, 100, 0.5</i>\n\n` +
-        `Please enter the amount in ${upperText}:`,
+      `<b>Step 3 of 4:</b> What's the amount you want to request?\n\n` +
+      `<i>Example: 10.50, 100, 0.5</i>\n\n` +
+      `Please enter the amount in ${upperText}:`,
     );
 
     this.paymentCreationStates.set(userId, state);
@@ -865,12 +865,12 @@ export class MessageHandler {
     await this.telegramService.sendMessage(
       chatId,
       `✅ Amount set: <b>${amount} ${state.token}</b>\n\n` +
-        `<b>Step 4 of 4:</b> What customer details would you like to collect?\n\n` +
-        `<i>Examples: name, email, phone, address, notes</i>\n\n` +
-        `You can type:\n` +
-        `• Single fields: "name" then "email" then "phone"\n` +
-        `• Multiple fields at once: "name, email, phone, age"\n\n` +
-        `Type <b>"done"</b> when finished:`,
+      `<b>Step 4 of 4:</b> What customer details would you like to collect?\n\n` +
+      `<i>Examples: name, email, phone, address, notes</i>\n\n` +
+      `You can type:\n` +
+      `• Single fields: "name" then "email" then "phone"\n` +
+      `• Multiple fields at once: "name, email, phone, age"\n\n` +
+      `Type <b>"done"</b> when finished:`,
     );
 
     this.paymentCreationStates.set(userId, state);
@@ -916,8 +916,8 @@ export class MessageHandler {
       await this.telegramService.sendMessage(
         chatId,
         `✅ Added fields: <b>${fields.join(', ')}</b>\n\n` +
-          `<b>Current fields:</b>\n${detailsList}\n\n` +
-          `Type more fields (comma-separated or one by one) or <b>"done"</b> to continue:`,
+        `<b>Current fields:</b>\n${detailsList}\n\n` +
+        `Type more fields (comma-separated or one by one) or <b>"done"</b> to continue:`,
       );
     } else {
       // Add single field (initialize with empty string)
@@ -930,8 +930,8 @@ export class MessageHandler {
       await this.telegramService.sendMessage(
         chatId,
         `✅ Added field: <b>${lowerText}</b>\n\n` +
-          `<b>Current fields:</b>\n${detailsList}\n\n` +
-          `Type another field (or comma-separated fields) or <b>"done"</b> to continue:`,
+        `<b>Current fields:</b>\n${detailsList}\n\n` +
+        `Type another field (or comma-separated fields) or <b>"done"</b> to continue:`,
       );
     }
 
@@ -950,8 +950,8 @@ export class MessageHandler {
     const detailsList =
       state.details && Object.keys(state.details).length > 0
         ? Object.keys(state.details)
-            .map((field, index) => `  ${index + 1}. ${field}`)
-            .join('\n')
+          .map((field, index) => `  ${index + 1}. ${field}`)
+          .join('\n')
         : '  (No details to collect)';
 
     const confirmationText =

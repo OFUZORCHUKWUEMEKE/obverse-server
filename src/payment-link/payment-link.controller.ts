@@ -11,6 +11,13 @@ export class PaymentLinkController {
     return this.paymentLinkService.getAllPaymentLinks();
   }
 
+  @Get('user/:userId')
+  async getPaymentLinksByUserId(
+    @Param('userId') userId: string,
+  ): Promise<PaymentLinkDocument[]> {
+    return this.paymentLinkService.getPaymentLinksByUserId(userId);
+  }
+
   @Get(':linkId')
   async getPaymentLink(
     @Param('linkId') linkId: string,

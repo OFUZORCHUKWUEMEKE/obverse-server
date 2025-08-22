@@ -1,98 +1,216 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Obverse
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+> A stablecoin AI agent that helps merchants collect payments with links and QR codes directly from Telegram
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Obverse is an intelligent payment assistant that simplifies cryptocurrency transactions for merchants. Built as a Telegram bot, it enables seamless payment collection through shareable links and QR codes, making crypto payments as easy as traditional payment methods.
 
-## Description
+## 🌟 Features
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+### 💰 Wallet Management
+- **Automatic Wallet Creation**: Generates secure wallets for users via Para SDK
+- **Multi-Token Support**: Supports MNT, USDC, USDT, and DAI
+- **Balance Checking**: Real-time balance queries for all supported tokens
+- **Transaction History**: View complete transaction history including native and token transfers
 
-## Project setup
+### 💸 Payment Processing
+- **Payment Links**: Create shareable payment links with custom amounts
+- **QR Code Generation**: Automatic QR code generation for easy mobile payments
+- **Token Transfers**: Send cryptocurrencies directly through Telegram commands
+- **Transaction Tracking**: Monitor payment status and confirmations
 
+### 🤖 AI-Powered Assistant
+- **Natural Language Processing**: Understands payment requests in conversational language
+- **Smart Commands**: Intuitive command system for common operations
+- **Interactive Responses**: Provides helpful guidance and error handling
+- **Context Awareness**: Maintains conversation context for complex operations
+
+### 🔗 Telegram Integration
+- **Bot Commands**: Full command suite (`/start`, `/balance`, `/send`, `/payment`, etc.)
+- **Inline Keyboards**: Interactive buttons for easy navigation
+- **Group Support**: Works in both private chats and group conversations
+- **Error Handling**: Comprehensive error messages and recovery suggestions
+
+## 🛠 Technology Stack
+
+- **Backend**: NestJS with TypeScript
+- **Database**: MongoDB with Mongoose
+- **Blockchain**: Mantle Network (EVM-compatible)
+- **Wallet SDK**: Para SDK for secure wallet generation
+- **Telegram**: node-telegram-bot-api
+- **AI Framework**: Mastra for intelligent agent capabilities
+- **Smart Contracts**: ethers.js and viem for blockchain interactions
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js (v18 or higher)
+- MongoDB database
+- Telegram Bot Token
+- Para API Key
+
+### Installation
+
+1. Clone the repository:
 ```bash
-$ pnpm install
+git clone <repository-url>
+cd mantle
 ```
 
-## Compile and run the project
-
+2. Install dependencies:
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+pnpm install
 ```
 
-## Run tests
-
+3. Set up environment variables:
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+cp .env.example .env
 ```
 
-## Deployment
+Configure the following variables:
+```env
+# Telegram Bot Configuration
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+ENABLE_TELEGRAM=true
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+# Para SDK Configuration
+PARA_API_KEY=your_para_api_key
+PARA_ENVIRONMENT=beta
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+# Database Configuration
+MONGODB_URI=mongodb://localhost:27017/obverse
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+# Server Configuration
+PORT=4000
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+4. Start the development server:
+```bash
+pnpm run start:dev
+```
 
-## Resources
+## 📱 Usage
 
-Check out a few resources that may come in handy when working with NestJS:
+### Getting Started with the Bot
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+1. **Start the Bot**: Send `/start` to create your wallet
+2. **Check Balance**: Use `/balance` or ask "What's my balance?"
+3. **Send Tokens**: Use `/send <amount> <token> <address>`
+4. **Create Payment Link**: Use `/payment` to start the payment link wizard
+5. **View Transactions**: Use `/transactions` to see your payment history
 
-## Support
+### Available Commands
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+| Command | Description |
+|---------|-------------|
+| `/start` | Initialize wallet and start the bot |
+| `/help` | Show available commands and features |
+| `/wallet` | Display wallet information |
+| `/balance` | Check wallet balance for all tokens |
+| `/send` | Send cryptocurrency to another address |
+| `/payment` | Create a payment link |
+| `/transactions` | View transaction history |
+| `/settings` | Configure bot preferences |
 
-## Stay in touch
+### Payment Link Creation
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+1. Use the `/payment` command
+2. Specify the payment details:
+   - **Name**: Description for the payment
+   - **Token**: Choose from USDC, USDT, or DAI
+   - **Amount**: Payment amount
+   - **Details**: Optional additional information
 
-## License
+3. Share the generated link with customers
+4. Monitor payments through the bot
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## 🏗 Project Structure
+
+```
+src/
+├── config/           # Configuration management
+├── core/             # Core utilities and base classes
+├── mastra/           # AI agent and tools
+│   ├── agents/       # Payment processing agents
+│   └── tools/        # Blockchain interaction tools
+├── para/             # Para SDK wallet integration
+├── payment-link/     # Payment link management
+├── telegram/         # Telegram bot handlers
+├── transaction/      # Transaction processing
+├── users/            # User management
+└── wallet/           # Wallet operations
+```
+
+## 🔧 API Endpoints
+
+The application provides RESTful APIs alongside the Telegram interface:
+
+- `GET /api/docs` - Swagger API documentation
+- `GET /payment-links` - List payment links
+- `GET /transactions` - Transaction history
+- `POST /wallets/balance` - Check wallet balance
+- `POST /para/transfer` - Send tokens
+
+## 🧪 Testing
+
+Run the test suite:
+```bash
+# Unit tests
+pnpm run test
+
+# E2E tests
+pnpm run test:e2e
+
+# Test coverage
+pnpm run test:cov
+```
+
+## 🔒 Security Features
+
+- **Secure Wallet Generation**: Uses Para SDK's secure key management
+- **Environment Isolation**: Separate configurations for development and production
+- **Input Validation**: Comprehensive validation for all user inputs
+- **Error Handling**: Secure error messages that don't expose sensitive information
+- **Rate Limiting**: Built-in protection against abuse
+
+## 🌐 Supported Networks
+
+- **Primary**: Mantle Network (Chain ID: 5000)
+- **Tokens**: MNT, USDC, USDT, DAI
+
+## 📋 Roadmap
+
+- [ ] Multi-chain support
+- [ ] Fiat currency integration
+- [ ] Advanced analytics dashboard
+- [ ] Subscription-based payment links
+- [ ] Mobile app companion
+- [ ] Merchant dashboard
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit your changes: `git commit -m 'Add amazing feature'`
+4. Push to the branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
+
+## 📝 License
+
+This project is licensed under the UNLICENSED License - see the package.json for details.
+
+## 🆘 Support
+
+For support and questions:
+- Open an issue on GitHub
+- Contact the development team
+
+## 🙏 Acknowledgments
+
+- [Para](https://getpara.com) for wallet infrastructure
+- [Mantle Network](https://mantle.xyz) for blockchain platform
+- [NestJS](https://nestjs.com) for the robust backend framework
+- [Mastra](https://mastra.ai) for AI agent capabilities
+
+---
+
+Built with ❤️ for the future of cryptocurrency payments
