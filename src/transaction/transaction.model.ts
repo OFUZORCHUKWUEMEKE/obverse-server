@@ -85,10 +85,6 @@ export class Transaction {
   @Prop({ type: Types.ObjectId, ref: 'PaymentLink' })
   paymentLinkId?: Types.ObjectId;
 
-  // Telegram context
-  @Prop()
-  telegramMessageId?: string;
-
   @Prop()
   telegramChatId?: string;
 

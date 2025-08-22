@@ -10,6 +10,10 @@ export class PaymentLinkService {
     private readonly transactionRepository: TransactionRepository,
   ) {}
 
+  async getAllPaymentLinks(): Promise<PaymentLinkDocument[]> {
+    return this.paymentLinkRepository.find({});
+  }
+
   async getPaymentLinkByLinkId(linkId: string): Promise<PaymentLinkDocument> {
     const paymentLink = await this.paymentLinkRepository.findOne({ linkId });
 

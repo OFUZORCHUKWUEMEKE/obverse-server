@@ -59,10 +59,6 @@ export class CreateTransactionDto {
 
   @IsOptional()
   @IsString()
-  telegramMessageId?: string;
-
-  @IsOptional()
-  @IsString()
   telegramChatId?: string;
 
   @IsOptional()
