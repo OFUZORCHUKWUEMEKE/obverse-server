@@ -4,7 +4,7 @@ import { PaymentLinkDocument } from './payment-link.model';
 
 @Controller('payment-link')
 export class PaymentLinkController {
-  constructor(private readonly paymentLinkService: PaymentLinkService) { }
+  constructor(private readonly paymentLinkService: PaymentLinkService) {}
 
   @Get()
   async getAllPaymentLinks(): Promise<PaymentLinkDocument[]> {

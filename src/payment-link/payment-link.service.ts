@@ -8,7 +8,7 @@ export class PaymentLinkService {
   constructor(
     private readonly paymentLinkRepository: PaymentLinkRepository,
     private readonly transactionRepository: TransactionRepository,
-  ) { }
+  ) {}
 
   async getAllPaymentLinks(): Promise<PaymentLinkDocument[]> {
     return this.paymentLinkRepository.find({});
@@ -24,7 +24,9 @@ export class PaymentLinkService {
     return paymentLink;
   }
 
-  async getPaymentLinksByUserId(userId: string): Promise<PaymentLinkDocument[]> {
+  async getPaymentLinksByUserId(
+    userId: string,
+  ): Promise<PaymentLinkDocument[]> {
     return this.paymentLinkRepository.find({ creatorUserId: userId });
   }
 

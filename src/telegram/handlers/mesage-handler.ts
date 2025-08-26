@@ -109,6 +109,9 @@ export class MessageHandler {
       case '/cancel':
         await this.handleCancelCommand(chatId, userId);
         break;
+      case '/linkstats':
+        await this.handleLinkStatsCommand(chatId, userId, args);
+        break;
       default:
         await this.telegramService.sendMessage(
           chatId,
@@ -125,69 +128,27 @@ export class MessageHandler {
   ) {
     try {
       this.logger.log(
-        `Processing natural language request from user ${userId}: "${text}"`,
+        `Processing enhanced natural language request from user ${userId}: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`,
       );
 
-      // Check if the message is asking for balance or payment link creation
-      const lowerText = text.toLowerCase();
-      const isBalanceRequest =
-        lowerText.includes('balance') ||
-        lowerText.includes('check') ||
-        lowerText.includes('show') ||
-        lowerText.includes('wallet');
-
-      const isPaymentRequest =
-        lowerText.includes('payment') ||
-        lowerText.includes('link') ||
-        lowerText.includes('create') ||
-        lowerText.includes('pay');
-
-      let response: string;
-
-      if (isBalanceRequest && !isPaymentRequest) {
-        // Use Mastra AI agent to check balance
-        try {
-          const agent = this.mastraService.getAgent();
-          if (agent) {
-            const balanceResult = await agent.executeBalanceCheck(userId);
-            if (balanceResult.success) {
-              const balanceData = balanceResult.data;
-              response = this.formatBalanceResponse(balanceData);
-            } else {
-              response = `❌ ${balanceResult.error}`;
-            }
-          } else {
-            response = await this.mastraService.checkUserBalance(userId);
-          }
-        } catch (error) {
-          this.logger.error('Error with Mastra balance check:', error);
-          // Fallback to MCP service
-          response = await this.mcpService.processNaturalLanguage(text, userId);
-        }
-      } else if (isPaymentRequest && !isBalanceRequest) {
-        // Use Mastra AI agent for payment link guidance
-        response = await this.mastraService.processNaturalLanguage(
-          text,
-          userId,
-          chatId.toString(),
-        );
-
-        // If the AI suggests creating a payment link, guide user to use /payment command
-        if (
-          response.toLowerCase().includes('payment link') ||
-          response.toLowerCase().includes('create')
-        ) {
-          response +=
-            '\n\nTo create a payment link, use the /payment command or click the button below.';
-        }
-      } else {
-        // Use Mastra AI agent for general processing
-        response = await this.mastraService.processNaturalLanguage(
-          text,
-          userId,
-          chatId.toString(),
-        );
-      }
+      // Enhanced processing with smart Mastra agent
+      const response = await this.mastraService.processNaturalLanguage(
+        text,
+        userId,
+        chatId.toString(),
+        {
+          userInfo: {
+            firstName: msg.from?.first_name,
+            lastName: msg.from?.last_name,
+            username: msg.from?.username,
+          },
+          messageMetadata: {
+            messageId: msg.message_id,
+            timestamp: msg.date,
+            chatType: msg.chat.type,
+          },
+        },
+      );
 
       await this.telegramService.sendMessage(chatId, response, {
         reply_markup: {
@@ -334,6 +295,7 @@ export class MessageHandler {
       `📊 /transactions - View transaction history\n` +
       `💸 /send - Send cryptocurrency to another wallet\n` +
       `🔗 /payment - Create a payment link for receiving payments\n` +
+      `📈 /linkstats [linkId] - View payment link transaction statistics\n` +
       `👤 /wallet - Show wallet information\n` +
       `⚙️ /settings - Bot settings and preferences\n` +
       `❓ /help - Show this help message\n\n` +
@@ -342,7 +304,9 @@ export class MessageHandler {
       `• "Show my balance"\n` +
       `• "Send 100 USDC to 0x..."\n` +
       `• "Create payment link for $50"\n` +
-      `• "What are my recent transactions?"\n\n` +
+      `• "What are my recent transactions?"\n` +
+      `• "How many transactions on my payment links?"\n` +
+      `• "Track payment link transactions"\n\n` +
       `<b>Need help?</b> Just ask me anything!`;
 
     await this.telegramService.sendMessage(chatId, helpText);
@@ -732,6 +696,41 @@ export class MessageHandler {
       await this.telegramService.sendMessage(
         chatId,
         'No active payment creation process to cancel.',
+      );
+    }
+  }
+
+  private async handleLinkStatsCommand(
+    chatId: number,
+    userId: string,
+    args: string[],
+  ) {
+    try {
+      const telegramId = userId;
+
+      if (args.length === 0) {
+        // Get all payment links stats
+        const response = await this.mastraService.processNaturalLanguage(
+          'show me all payment link statistics',
+          telegramId,
+          chatId.toString(),
+        );
+        await this.telegramService.sendMessage(chatId, response);
+      } else {
+        // Get specific payment link stats
+        const linkId = args[0];
+        const response = await this.mastraService.processNaturalLanguage(
+          `payment link stats for ${linkId}`,
+          telegramId,
+          chatId.toString(),
+        );
+        await this.telegramService.sendMessage(chatId, response);
+      }
+    } catch (error) {
+      this.logger.error('Error in linkstats command:', error);
+      await this.telegramService.sendErrorMessage(
+        chatId,
+        'Failed to retrieve payment link statistics. Please try again.',
       );
     }
   }
