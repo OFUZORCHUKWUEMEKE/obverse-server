@@ -1507,6 +1507,12 @@ Try using one of these names with /payment-link command.`,
         const baseUrl = process.env.BASE_URL || 'https://obverse-ui.vercel.app';
         const trackingUrl = `${baseUrl}/transactions/${paymentLink.linkId}`;
 
+        // Debug logging
+        this.logger.log(`Debug tracking URL construction (message handler):`);
+        this.logger.log(`- baseUrl: "${baseUrl}"`);
+        this.logger.log(`- linkId: "${paymentLink.linkId}"`);
+        this.logger.log(`- trackingUrl: "${trackingUrl}"`);
+
         await this.telegramService.sendMessage(
           chatId,
           `✅ <b>Payment Link Found!</b>
@@ -1517,7 +1523,7 @@ Try using one of these names with /payment-link command.`,
 📈 <b>Transactions:</b> ${paymentLink.payments?.length || 0}
 
 🔗 <b>Transaction Tracking:</b>
-${trackingUrl}`,
+<a href="${trackingUrl}">${trackingUrl}</a>`,
           {
             reply_markup: {
               inline_keyboard: [
