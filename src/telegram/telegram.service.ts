@@ -303,6 +303,18 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async deleteMessage(chatId: number, messageId: number) {
+    try {
+      return await this.bot.deleteMessage(chatId, messageId);
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete message ${messageId} in chat ${chatId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
   getBotInstance(): TelegramBot {
     return this.bot;
   }

@@ -1,6 +1,6 @@
 # Telegram Crypto AI Agent with Mastra Integration
 
-This module implements an AI agent that integrates with Mastra AI to provide intelligent cryptocurrency wallet operations through Telegram.
+This module implements an intelligent AI agent powered by Anthropic's Claude-3.5-Sonnet that provides smart cryptocurrency wallet operations through Telegram using Mastra's AI functionality.
 
 ## Overview
 
@@ -15,9 +15,10 @@ The AI agent can:
 ### Core Components
 
 1. **TelegramCryptoAgent** (`agents/payment.ts`)
-   - Main agent class that integrates with Mastra AI
-   - Handles natural language processing
-   - Provides direct tool access methods
+   - Main agent class powered by Claude-3.5-Sonnet via AI SDK
+   - Uses intelligent natural language understanding instead of manual intent parsing
+   - Integrates directly with Mastra tools for wallet operations
+   - Provides direct tool access methods for programmatic use
 
 2. **Balance Tool** (`tools/balance-tool.ts`)
    - Implements `create_balance` function

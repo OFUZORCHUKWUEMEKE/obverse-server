@@ -25,7 +25,7 @@ export class PaymentLinkController {
     return this.paymentLinkService.getPaymentLinkByLinkId(linkId);
   }
 
-  @Post(':linkId/transactions')
+  @Get('/transactions/:linkId')
   async getPaymentLinkWithTransaction(@Param('linkId') linkId: string) {
     return await this.paymentLinkService.getPaymentLinkWithTransactions(linkId);
   }

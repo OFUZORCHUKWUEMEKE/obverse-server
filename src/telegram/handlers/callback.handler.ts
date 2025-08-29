@@ -21,7 +21,7 @@ export class CallbackHandler {
     private paymentLinkRepository: PaymentLinkRepository,
     private walletRepository: WalletRepository,
     private mastraService: MastraService,
-  ) { }
+  ) {}
 
   async handleCallback(callbackQuery: TelegramBot.CallbackQuery) {
     const chatId = callbackQuery.message?.chat.id;
@@ -71,6 +71,9 @@ export class CallbackHandler {
         } else if (data.startsWith('view_payment_')) {
           const paymentId = data.replace('view_payment_', '');
           await this.handleViewPaymentDetails(chatId, paymentId);
+        } else if (data.startsWith('track_link:')) {
+          const linkId = data.replace('track_link:', '');
+          await this.handleTrackLinkCallback(chatId, userId, linkId);
         } else if (data.startsWith('payment_token_')) {
           const token = data.replace('payment_token_', '');
           await this.handlePaymentTokenCallback(chatId, userId, token);
@@ -235,13 +238,13 @@ export class CallbackHandler {
     await this.telegramBotService.sendMessage(
       chatId,
       `💸 <b>Send Tokens</b>\n\n` +
-      `<b>Usage:</b> <code>/send &lt;amount&gt; &lt;token&gt; &lt;address&gt; [memo]</code>\n\n` +
-      `<b>Examples:</b>\n` +
-      `• <code>/send 10 USDC 0x123...abc</code>\n` +
-      `• <code>/send 0.5 MNT 0x456...def Payment for coffee</code>\n` +
-      `• <code>/send 100 USDT 0x789...ghi Monthly subscription</code>\n\n` +
-      `<b>Supported tokens:</b> MNT, USDC, USDT, DAI\n\n` +
-      `<i>Note: The address must be a valid Ethereum address</i>`,
+        `<b>Usage:</b> <code>/send &lt;amount&gt; &lt;token&gt; &lt;address&gt; [memo]</code>\n\n` +
+        `<b>Examples:</b>\n` +
+        `• <code>/send 10 USDC 0x123...abc</code>\n` +
+        `• <code>/send 0.5 MNT 0x456...def Payment for coffee</code>\n` +
+        `• <code>/send 100 USDT 0x789...ghi Monthly subscription</code>\n\n` +
+        `<b>Supported tokens:</b> MNT, USDC, USDT, DAI\n\n` +
+        `<i>Note: The address must be a valid Ethereum address</i>`,
       {
         reply_markup: {
           inline_keyboard: [
@@ -281,7 +284,7 @@ export class CallbackHandler {
     await this.telegramBotService.sendMessage(
       chatId,
       `📋 <b>Wallet Address</b>\n\n<code>${address}</code>\n\n` +
-      `<i>Tap to copy the address above</i>`,
+        `<i>Tap to copy the address above</i>`,
     );
   }
 
@@ -300,7 +303,7 @@ export class CallbackHandler {
       await this.telegramBotService.sendMessage(
         chatId,
         `📋 <b>Payment Link</b>\n\n<code>${paymentLink.linkUrl}</code>\n\n` +
-        `<i>Tap to copy the link above, or use the button below to open it.</i>`,
+          `<i>Tap to copy the link above, or use the button below to open it.</i>`,
         {
           reply_markup: {
             inline_keyboard: [
@@ -354,8 +357,8 @@ export class CallbackHandler {
       const detailsList =
         paymentLink.details && Object.keys(paymentLink.details).length > 0
           ? Object.keys(paymentLink.details)
-            .map((field, index) => `  ${index + 1}. ${field}`)
-            .join('\n')
+              .map((field, index) => `  ${index + 1}. ${field}`)
+              .join('\n')
           : '  No details to collect';
 
       // Format payment info
@@ -505,8 +508,8 @@ export class CallbackHandler {
       await this.telegramBotService.sendMessage(
         chatId,
         `⏳ <b>Processing Transfer...</b>\n\n` +
-        `💸 Sending ${amount} ${token} to <code>${toAddress}</code>\n\n` +
-        `⚠️ Please wait, this may take a few moments...`,
+          `💸 Sending ${amount} ${token} to <code>${toAddress}</code>\n\n` +
+          `⚠️ Please wait, this may take a few moments...`,
       );
 
       // Execute the transfer using Mastra service
@@ -536,8 +539,8 @@ export class CallbackHandler {
       await this.telegramBotService.sendMessage(
         chatId,
         `❌ <b>Transfer Failed</b>\n\n` +
-        `An error occurred while processing your transfer. Please try again later.\n\n` +
-        `Error: ${error.message}`,
+          `An error occurred while processing your transfer. Please try again later.\n\n` +
+          `Error: ${error.message}`,
         {
           reply_markup: {
             inline_keyboard: [
@@ -567,5 +570,76 @@ export class CallbackHandler {
         },
       },
     );
+  }
+
+  private async handleTrackLinkCallback(
+    chatId: number,
+    userId: string,
+    linkId: string,
+  ) {
+    try {
+      // Get the payment link by ID
+      const paymentLinks =
+        await this.mastraService.getPaymentLinksRawData(userId);
+
+      if (!paymentLinks || paymentLinks.length === 0) {
+        await this.telegramBotService.sendMessage(
+          chatId,
+          '❌ No payment links found.',
+        );
+        return;
+      }
+
+      // Find the specific payment link
+      const paymentLink = paymentLinks.find((link) => link.linkId === linkId);
+
+      if (!paymentLink) {
+        await this.telegramBotService.sendMessage(
+          chatId,
+          '❌ Payment link not found.',
+        );
+        return;
+      }
+
+      // Generate tracking URL
+      const baseUrl = process.env.BASE_URL || 'https://obverse-ui.vercel.app';
+      const trackingUrl = `${baseUrl}/transactions/${paymentLink.linkId}`;
+
+      await this.telegramBotService.sendMessage(
+        chatId,
+        `✅ <b>Payment Link Tracking</b>
+
+🔗 <b>Name:</b> ${paymentLink.title}
+💰 <b>Amount:</b> ${paymentLink.amount} ${paymentLink.token}
+📊 <b>Status:</b> ${paymentLink.status}
+📈 <b>Transactions:</b> ${paymentLink.payments?.length || 0}
+
+🔗 <b>Transaction Tracking:</b>
+${trackingUrl}`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '🌐 View Transactions', url: trackingUrl },
+                {
+                  text: '📊 Payment Stats',
+                  callback_data: `stats:${paymentLink.linkId}`,
+                },
+              ],
+              [
+                { text: '💰 Balance', callback_data: 'balance' },
+                { text: '🔗 New Link', callback_data: 'payment' },
+              ],
+            ],
+          },
+        },
+      );
+    } catch (error) {
+      this.logger.error('Error in track link callback:', error);
+      await this.telegramBotService.sendMessage(
+        chatId,
+        '❌ Failed to get payment link details. Please try again.',
+      );
+    }
   }
 }

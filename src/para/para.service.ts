@@ -15,6 +15,28 @@ import {
 // Initialize Para SDK with your API key and environment
 // const para = new ParaServer(Environment.PRODUCTION, API_KEY);
 
+const sepolia = defineChain({
+  id: 11155111,
+  name: 'Sepolia',
+  network: 'sepolia',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Sepolia Ether',
+    symbol: 'ETH',
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://ethereum-sepolia-rpc.publicnode.com'],
+    },
+    public: {
+      http: ['https://ethereum-sepolia-rpc.publicnode.com'],
+    },
+  },
+  blockExplorers: {
+    default: { name: 'Etherscan', url: 'https://sepolia.etherscan.io' },
+  },
+});
+
 const mantle = defineChain({
   id: 5000,
   name: 'Mantle',
@@ -42,11 +64,15 @@ const mantleClient = createPublicClient({
   transport: http(),
 });
 
-// Token contract addresses on Mantle network
-const TOKEN_ADDRESSES = {
-  USDC: '0x09Bc4E0D864854c6aFB6eB9A9cdF58ac190D0dF9' as `0x${string}`,
-  USDT: '0x201EBa5CC46D216Ce6DC03F6a759e8E766e956Ae' as `0x${string}`,
-  DAI: '0xdA10009cBd5D07dd0CeCc66161FC93D7c9000da1' as `0x${string}`,
+const sepoliaClient = createPublicClient({
+  chain: sepolia,
+  transport: http(),
+});
+
+const SEPOLIA_TOKEN_ADDRESSES = {
+  USDC: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`, // Example Sepolia USDC
+  USDT: '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06' as `0x${string}`, // Example Sepolia USDT
+  DAI: '0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6' as `0x${string}`, // Example Sepolia DAI
 } as const;
 
 // Token decimals mapping (fallback for contracts that don't implement decimals properly)
@@ -56,7 +82,7 @@ const TOKEN_DECIMALS = {
   DAI: 18,
 } as const;
 
-type TokenSymbol = keyof typeof TOKEN_ADDRESSES;
+type TokenSymbol = keyof typeof SEPOLIA_TOKEN_ADDRESSES;
 
 interface TokenBalance {
   symbol: string;
@@ -111,9 +137,7 @@ interface WalletTransactions {
 export class ParaService {
   private readonly logger = new Logger(ParaService.name);
   private readonly para: ParaServer;
-  private readonly signer: ParaEthersSigner;
-  private readonly ethersProvider: JsonRpcProvider;
-  private readonly client = mantleClient;
+  private readonly client = sepoliaClient;
 
   constructor(private config: ConfigService) {
     const apiKey = 'beta_db1c28fdfd30d5074d221a26559caf95';
@@ -130,8 +154,6 @@ export class ParaService {
     this.para = new ParaServer(Environment.BETA, apiKey);
 
     this.logger.log(`Para SDK initialized successfully`);
-    // this.signer = new ParaEthersSigner(this.para);
-    // this.ethersProvider = new JsonRpcProvider("https://rpc.mantle.xyz");
   }
 
   // Expose Para SDK instance
@@ -178,38 +200,50 @@ export class ParaService {
     }
   }
 
-  async getBalance(address: string, tokens?: string[]) {
+  async getBalance(address: string) {
     try {
-      const provider = new ethers.JsonRpcProvider('https://1rpc.io/mantle');
-      // const signer = new ParaEthersSigner(this.para, provider);
+      this.logger.log(`Fetching ETH balance for address: ${address}`);
+      const provider = new ethers.JsonRpcProvider(
+        'https://ethereum-sepolia-rpc.publicnode.com',
+      );
       const balance = await provider.getBalance(address);
-      console.log(`Balance: ${ethers.formatEther(balance)} ETH`);
-      return { balance };
+      const formattedBalance = ethers.formatEther(balance);
+      this.logger.log(
+        `ETH Balance fetched successfully: ${formattedBalance} ETH`,
+      );
+      return { balance: formattedBalance };
     } catch (error) {
-      this.logger.error(`Failed to get balance for address ${address}:`, error);
+      this.logger.error(
+        `Failed to get ETH balance for address ${address}:`,
+        error,
+      );
       throw error;
     }
   }
 
   async getMantleBalance(address: string) {
     try {
+      this.logger.log(
+        `Fetching Sepolia ETH balance via viem for address: ${address}`,
+      );
       const balance = await this.client.getBalance({
         address: address as `0x${string}`,
       });
 
-      console.log(`Balance: ${balance} wei`);
+      this.logger.log(`Raw balance: ${balance} wei`);
 
-      // Convert to MNT
-      const balanceInMNT = formatEther(balance);
-      console.log(`Balance: ${balanceInMNT} MNT`);
+      // Convert to ETH
+      const balanceInETH = formatEther(balance);
+      this.logger.log(`Formatted balance: ${balanceInETH} ETH`);
 
       return {
         raw: balance,
-        formatted: balanceInMNT,
-        symbol: 'MNT',
+        formatted: balanceInETH,
+        symbol: 'ETH',
+        balance: balanceInETH,
       };
     } catch (error) {
-      this.logger.error('Error fetching Mantle balance:', error);
+      this.logger.error('Error fetching Sepolia balance via viem:', error);
       throw error;
     }
   }
@@ -219,7 +253,7 @@ export class ParaService {
     tokenSymbol: TokenSymbol,
   ): Promise<TokenBalance> {
     try {
-      const contractAddress = TOKEN_ADDRESSES[tokenSymbol];
+      const contractAddress = SEPOLIA_TOKEN_ADDRESSES[tokenSymbol];
       const fallbackDecimals = TOKEN_DECIMALS[tokenSymbol];
 
       const contract = getContract({
@@ -261,8 +295,56 @@ export class ParaService {
     }
   }
 
+  // async getTokenBalance(
+  //   address: string,
+  //   tokenSymbol: TokenSymbol,
+  // ): Promise<TokenBalance> {
+  //   try {
+  //     const contractAddress = TOKEN_ADDRESSES[tokenSymbol];
+  //     const fallbackDecimals = TOKEN_DECIMALS[tokenSymbol];
+
+  //     const contract = getContract({
+  //       address: contractAddress,
+  //       abi: erc20Abi,
+  //       client: this.client,
+  //     });
+
+  //     // Get balance first
+  //     const balance = await contract.read.balanceOf([address as `0x${string}`]);
+
+  //     // Try to get decimals, fallback to predefined value if contract doesn't support it
+  //     let decimals: number;
+  //     try {
+  //       decimals = await contract.read.decimals();
+  //     } catch (decimalsError) {
+  //       this.logger.warn(
+  //         `Contract ${contractAddress} doesn't support decimals(), using fallback: ${fallbackDecimals}`,
+  //       );
+  //       decimals = fallbackDecimals;
+  //     }
+
+  //     // Format balance correctly based on actual decimals
+  //     const divisor = BigInt(10 ** decimals);
+  //     const formattedBalance = (Number(balance) / Number(divisor)).toString();
+
+  //     return {
+  //       symbol: tokenSymbol,
+  //       balance: formattedBalance,
+  //       decimals,
+  //       contractAddress,
+  //     };
+  //   } catch (error) {
+  //     this.logger.error(
+  //       `Error fetching ${tokenSymbol} balance for ${address}:`,
+  //       error,
+  //     );
+  //     throw error;
+  //   }
+  // }
+
   async getAllTokenBalances(address: string): Promise<TokenBalance[]> {
     try {
+      this.logger.log(`Fetching all token balances for address: ${address}`);
       const tokenSymbols: TokenSymbol[] = ['USDC', 'USDT', 'DAI'];
 
       const balancePromises = tokenSymbols.map((symbol) =>
@@ -273,13 +355,15 @@ export class ParaService {
           return {
             symbol,
             balance: '0',
-            decimals: 18,
-            contractAddress: TOKEN_ADDRESSES[symbol],
+            decimals: TOKEN_DECIMALS[symbol] || 18,
+            contractAddress: SEPOLIA_TOKEN_ADDRESSES[symbol],
           };
         }),
       );
 
-      return await Promise.all(balancePromises);
+      const results = await Promise.all(balancePromises);
+      this.logger.log(`Successfully fetched ${results.length} token balances`);
+      return results;
     } catch (error) {
       this.logger.error(`Error fetching token balances for ${address}:`, error);
       throw error;
@@ -316,9 +400,9 @@ export class ParaService {
     limit: number,
   ): Promise<Transaction[]> {
     try {
-      // Use Mantle Explorer API to get native transactions
+      // Use Sepolia Etherscan API to get native transactions
       const response = await fetch(
-        `https://explorer.mantle.xyz/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=1&offset=${limit}&sort=desc`,
+        `https://api-sepolia.etherscan.io/api?module=account&action=txlist&address=${address}&startblock=0&endblock=99999999&page=1&offset=${limit}&sort=desc&apikey=YourApiKeyToken`,
       );
 
       if (!response.ok) {
@@ -347,9 +431,9 @@ export class ParaService {
     limit: number,
   ): Promise<TokenTransfer[]> {
     try {
-      // Use Mantle Explorer API to get token transfers
+      // Use Sepolia Etherscan API to get token transfers
       const response = await fetch(
-        `https://explorer.mantle.xyz/api?module=account&action=tokentx&address=${address}&startblock=0&endblock=99999999&page=1&offset=${limit}&sort=desc`,
+        `https://api-sepolia.etherscan.io/api?module=account&action=tokentx&address=${address}&startblock=0&endblock=99999999&page=1&offset=${limit}&sort=desc&apikey=YourApiKeyToken`,
       );
 
       if (!response.ok) {
@@ -381,7 +465,7 @@ export class ParaService {
     const direction = isIncoming ? '📥' : '📤';
 
     return (
-      `${direction} <b>${parseFloat(value).toFixed(6)} MNT</b>\n` +
+      `${direction} <b>${parseFloat(value).toFixed(6)} ETH</b>\n` +
       `<b>Hash:</b> <code>${tx.hash.substring(0, 10)}...${tx.hash.substring(tx.hash.length - 8)}</code>\n` +
       `<b>Time:</b> ${timestamp.toLocaleDateString()} ${timestamp.toLocaleTimeString()}\n` +
       `<b>Status:</b> ${tx.txreceipt_status === '1' ? '✅ Success' : '❌ Failed'}`
