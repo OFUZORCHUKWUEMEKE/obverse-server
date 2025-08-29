@@ -104,7 +104,7 @@ export const createPaymentTrackingTool = (
             errorMessage = `Payment link with ID "${linkId}" not found or you don't have access to it`;
           } else if (linkName) {
             errorMessage = `No payment links found matching "${linkName}"`;
-            
+
             // Get all user's payment links to provide suggestions
             const allUserLinks = await paymentLinkRepository.find({ creatorUserId: user._id });
             if (allUserLinks && allUserLinks.length > 0) {
@@ -116,10 +116,10 @@ export const createPaymentTrackingTool = (
           } else {
             errorMessage = 'No payment links found for this user';
           }
-          
+
           // Generate smart error message
           let smartErrorMessage = '';
-          
+
           if (linkId) {
             smartErrorMessage = `❌ **Payment Link Not Found**\n\n`;
             smartErrorMessage += `I couldn't find a payment link with ID "${linkId}". This could mean:\n`;
@@ -132,7 +132,7 @@ export const createPaymentTrackingTool = (
           } else if (linkName) {
             smartErrorMessage = `🔍 **No Matches Found**\n\n`;
             smartErrorMessage += `I couldn't find any payment links matching "${linkName}"\n\n`;
-            
+
             if (suggestions.length > 0) {
               smartErrorMessage += `🎯 **Your Available Payment Links:**\n`;
               suggestions.forEach((suggestion, idx) => {
@@ -350,7 +350,7 @@ function generatePaymentInsights(
     insights.push(
       `✅ Successfully located "${link.title}" - transaction tracking is now available`,
     );
-    
+
     if (link.metrics.totalTransactions > 0) {
       insights.push(
         `💡 This payment link is performing well with ${link.metrics.totalTransactions} transactions`,
@@ -364,11 +364,11 @@ function generatePaymentInsights(
     insights.push(
       `🔍 Found ${linkSummaries.length} payment links matching "${searchName}" - all tracking URLs provided`,
     );
-    
+
     const bestPerformer = linkSummaries.reduce((best, current) =>
       parseFloat(current.metrics.totalAmountReceived) > parseFloat(best.metrics.totalAmountReceived) ? current : best
     );
-    
+
     if (parseFloat(bestPerformer.metrics.totalAmountReceived) > 0) {
       insights.push(
         `🏆 "${bestPerformer.title}" is your top performer among these matches`,
@@ -388,7 +388,7 @@ function generatePaymentInsights(
     insights.push(
       `🏆 Your top earner: "${bestLink.title}" generated $${bestLink.metrics.totalAmountReceived}`,
     );
-    
+
     // Add actionable advice for the best performer
     if (parseFloat(bestLink.metrics.conversionRate) > 5) {
       insights.push(
@@ -410,7 +410,7 @@ function generatePaymentInsights(
     const highPerformingLinks = linkSummaries.filter(
       (link) => parseFloat(link.metrics.conversionRate) > avgConversionRate,
     );
-    
+
     const lowPerformingLinks = linkSummaries.filter(
       (link) => parseFloat(link.metrics.conversionRate) < avgConversionRate && parseFloat(link.metrics.conversionRate) > 0,
     );
@@ -420,7 +420,7 @@ function generatePaymentInsights(
         `🚀 ${highPerformingLinks.length} link(s) beating your average - these are your winners!`,
       );
     }
-    
+
     if (lowPerformingLinks.length > 0) {
       insights.push(
         `📈 ${lowPerformingLinks.length} link(s) below average - try optimizing their descriptions or amounts`,
@@ -485,7 +485,7 @@ function generateSmartResponse(
 ): string {
   const timeframeText = {
     '24h': 'last 24 hours',
-    '7d': 'last 7 days', 
+    '7d': 'last 7 days',
     '30d': 'last 30 days',
     '90d': 'last 90 days',
     'all': 'all time'
@@ -498,13 +498,13 @@ function generateSmartResponse(
     if (paymentLinks.length === 1) {
       const link = linkSummaries[0];
       const tokenEmoji = getTokenEmoji(link.token);
-      
+
       response += `✅ **Payment Link Found!**\n\n`;
       response += `🔗 **Name:** ${link.title}\n`;
       response += `💰 **Amount:** ${link.amount} ${tokenEmoji} ${link.token}\n`;
       response += `📊 **Status:** ${link.status.charAt(0).toUpperCase() + link.status.slice(1)}\n`;
       response += `📈 **Transactions:** ${link.metrics.totalTransactions}\n`;
-      
+
       if (link.trackingUrl) {
         response += `\n🌐 **Transaction Tracking:**\n${link.trackingUrl}\n`;
       }
@@ -516,7 +516,7 @@ function generateSmartResponse(
         response += `• Views: ${link.metrics.viewCount}\n`;
         response += `• Conversion Rate: ${link.metrics.conversionRate}%\n`;
         response += `• Average Transaction: $${link.metrics.averageTransactionAmount}\n`;
-        
+
         if (link.metrics.lastPaymentAt) {
           const lastPayment = new Date(link.metrics.lastPaymentAt).toLocaleString();
           response += `• Last Payment: ${lastPayment}\n`;
@@ -540,7 +540,7 @@ function generateSmartResponse(
     } else if (paymentLinks.length > 1) {
       response += `🔍 **Multiple Links Found**\n\n`;
       response += `Found **${paymentLinks.length}** payment links matching "${linkName}"\n\n`;
-      
+
       linkSummaries.forEach((link, idx) => {
         const tokenEmoji = getTokenEmoji(link.token);
         response += `**${idx + 1}. ${link.title}**\n`;
@@ -584,7 +584,7 @@ function generateSmartResponse(
       // Active vs inactive links
       const activeLinks = linkSummaries.filter(link => link.metrics.totalTransactions > 0);
       const inactiveLinks = linkSummaries.filter(link => link.metrics.totalTransactions === 0);
-      
+
       if (activeLinks.length > 0) {
         response += `✅ **Active:** ${activeLinks.length} links with transactions\n`;
       }
@@ -606,7 +606,7 @@ function generateSmartResponse(
 function getTokenEmoji(token: string): string {
   const emojis = {
     'USDC': '🔵',
-    'USDT': '🟢', 
+    'USDT': '🟢',
     'DAI': '🟡',
     'MNT': '🟢'
   };
