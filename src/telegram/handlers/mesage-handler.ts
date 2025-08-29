@@ -24,10 +24,15 @@ interface PaymentLinkCreationState {
   currentDetailField?: string;
 }
 
+interface PaymentLinkTrackingState {
+  step: 'asking_name';
+}
+
 @Injectable()
 export class MessageHandler {
   private readonly logger = new Logger(MessageHandler.name);
   private paymentCreationStates = new Map<string, PaymentLinkCreationState>();
+  private paymentTrackingStates = new Map<string, PaymentLinkTrackingState>();
 
   constructor(
     @Inject(forwardRef(() => TelegramService))
@@ -60,12 +65,21 @@ export class MessageHandler {
     } else {
       // Check if user is in payment creation flow
       const paymentState = this.paymentCreationStates.get(userId);
+      const trackingState = this.paymentTrackingStates.get(userId);
+
       if (paymentState) {
         await this.handlePaymentCreationFlowInternal(
           chatId,
           userId,
           text,
           paymentState,
+        );
+      } else if (trackingState) {
+        await this.handlePaymentLinkTrackingFlow(
+          chatId,
+          userId,
+          text,
+          trackingState,
         );
       } else {
         await this.handleNaturalLanguage(chatId, userId, text, msg);
@@ -112,6 +126,9 @@ export class MessageHandler {
       case '/linkstats':
         await this.handleLinkStatsCommand(chatId, userId, args);
         break;
+      case '/payment-link':
+        await this.handlePaymentLinkTrackingCommand(chatId, userId);
+        break;
       default:
         await this.telegramService.sendMessage(
           chatId,
@@ -129,6 +146,23 @@ export class MessageHandler {
     try {
       this.logger.log(
         `Processing enhanced natural language request from user ${userId}: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`,
+      );
+
+      // Send processing message
+      const processingMessages = [
+        '🤖 Processing your request...',
+        '💭 Thinking...',
+        '⚡ Working on it...',
+        '🔍 Analyzing...',
+        '🧠 Processing...',
+      ];
+      const processingMsg =
+        processingMessages[
+        Math.floor(Math.random() * processingMessages.length)
+        ];
+      const processingMsgId = await this.telegramService.sendMessage(
+        chatId,
+        processingMsg,
       );
 
       // Enhanced processing with smart Mastra agent
@@ -150,20 +184,154 @@ export class MessageHandler {
         },
       );
 
-      await this.telegramService.sendMessage(chatId, response, {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '💰 Balance', callback_data: 'balance' },
-              { text: '📊 Transactions', callback_data: 'transactions' },
+      // Delete processing message
+      if (processingMsgId) {
+        try {
+          await this.telegramService.deleteMessage(
+            chatId,
+            processingMsgId.message_id,
+          );
+        } catch (error) {
+          // Ignore deletion errors
+        }
+      }
+
+      // Check if this is a payment link creation response
+      if (response.includes('✅ Payment link created!')) {
+        // Extract link URL from response
+        const linkUrlMatch = response.match(/🌐 (https:\/\/[^\s]+)/);
+        const linkUrl = linkUrlMatch ? linkUrlMatch[1] : null;
+
+        // Extract QR code data from response
+        const qrCodeMatch = response.match(
+          /\[QR_CODE\](data:image\/png;base64,[^[]+)\[\/QR_CODE\]/,
+        );
+        const qrCodeDataUrl = qrCodeMatch ? qrCodeMatch[1] : null;
+
+        // Clean the response text by removing QR code data
+        const cleanResponse = response.replace(
+          /\n\n\[QR_CODE\][^[]+\[\/QR_CODE\]/,
+          '',
+        );
+
+        if (linkUrl) {
+          // Send the text response first
+          await this.telegramService.sendMessage(chatId, cleanResponse);
+
+          // Send QR code as image if available
+          if (qrCodeDataUrl) {
+            try {
+              // Convert base64 to buffer
+              const base64Data = qrCodeDataUrl.replace(
+                /^data:image\/png;base64,/,
+                '',
+              );
+              const qrCodeBuffer = Buffer.from(base64Data, 'base64');
+
+              await this.telegramService.sendPhoto(chatId, qrCodeBuffer, {
+                caption: `📱 QR Code for your payment link\n🌐 ${linkUrl}`,
+                reply_markup: {
+                  inline_keyboard: [
+                    [
+                      { text: '🌐 Open Payment Page', url: linkUrl },
+                      {
+                        text: '📋 Copy Link',
+                        callback_data: `copy_link:${linkUrl}`,
+                      },
+                    ],
+                    [
+                      { text: '💰 Balance', callback_data: 'balance' },
+                      { text: '🔗 New Payment Link', callback_data: 'payment' },
+                    ],
+                  ],
+                },
+              });
+            } catch (error) {
+              this.logger.error('Error sending QR code image:', error);
+              // Fallback to text message with buttons
+              await this.telegramService.sendMessage(
+                chatId,
+                '🔗 Ready to share:',
+                {
+                  reply_markup: {
+                    inline_keyboard: [
+                      [
+                        { text: '🌐 Open Payment Page', url: linkUrl },
+                        {
+                          text: '📋 Copy Link',
+                          callback_data: `copy_link:${linkUrl}`,
+                        },
+                      ],
+                      [
+                        { text: '💰 Balance', callback_data: 'balance' },
+                        {
+                          text: '🔗 New Payment Link',
+                          callback_data: 'payment',
+                        },
+                      ],
+                    ],
+                  },
+                },
+              );
+            }
+          } else {
+            // No QR code, send just buttons
+            await this.telegramService.sendMessage(
+              chatId,
+              '🔗 Ready to share:',
+              {
+                reply_markup: {
+                  inline_keyboard: [
+                    [
+                      { text: '🌐 Open Payment Page', url: linkUrl },
+                      {
+                        text: '📋 Copy Link',
+                        callback_data: `copy_link:${linkUrl}`,
+                      },
+                    ],
+                    [
+                      { text: '💰 Balance', callback_data: 'balance' },
+                      { text: '🔗 New Payment Link', callback_data: 'payment' },
+                    ],
+                  ],
+                },
+              },
+            );
+          }
+        } else {
+          // Fallback to regular message
+          await this.telegramService.sendMessage(chatId, response, {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '💰 Balance', callback_data: 'balance' },
+                  { text: '📊 Transactions', callback_data: 'transactions' },
+                ],
+                [
+                  { text: '💸 Send', callback_data: 'send' },
+                  { text: '🔗 Payment Link', callback_data: 'payment' },
+                ],
+              ],
+            },
+          });
+        }
+      } else {
+        // Regular response with standard buttons
+        await this.telegramService.sendMessage(chatId, response, {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '💰 Balance', callback_data: 'balance' },
+                { text: '📊 Transactions', callback_data: 'transactions' },
+              ],
+              [
+                { text: '💸 Send', callback_data: 'send' },
+                { text: '🔗 Payment Link', callback_data: 'payment' },
+              ],
             ],
-            [
-              { text: '💸 Send', callback_data: 'send' },
-              { text: '🔗 Payment Link', callback_data: 'payment' },
-            ],
-          ],
-        },
-      });
+          },
+        });
+      }
     } catch (error) {
       this.logger.error('Error processing natural language:', error);
       await this.telegramService.sendErrorMessage(
@@ -393,11 +561,15 @@ export class MessageHandler {
         '⏳ Fetching your balances...',
       );
 
+      this.logger.log(`Starting balance fetch for wallet: ${wallet.address}`);
       const [ethBalance, mantleBalance, tokenBalances] = await Promise.all([
         this.paraService.getBalance(wallet.address),
         this.paraService.getMantleBalance(wallet.address),
         this.paraService.getAllTokenBalances(wallet.address),
       ]);
+      this.logger.log(
+        `Balance fetch completed. ETH: ${ethBalance.balance}, Mantle: ${mantleBalance.formatted}, Tokens: ${tokenBalances.length} items`,
+      );
 
       let balanceText =
         `💰 <b>Your Wallet Balance</b>\n\n` +
@@ -1215,5 +1387,192 @@ export class MessageHandler {
     balanceText += `\n<b>📍 Wallet Address:</b>\n<code>${balanceData.walletAddress}</code>`;
 
     return balanceText;
+  }
+
+  // Payment Link Tracking Command Handler
+  private async handlePaymentLinkTrackingCommand(
+    chatId: number,
+    userId: string,
+  ) {
+    try {
+      // Set user state to asking for payment link name
+      this.paymentTrackingStates.set(userId, { step: 'asking_name' });
+
+      await this.telegramService.sendMessage(
+        chatId,
+        `🔍 <b>Payment Link Tracker</b>
+
+Please enter the <b>name/title</b> of the payment link you want to track:
+
+For example: "Coffee", "Service Payment", etc.`,
+        {
+          reply_markup: {
+            inline_keyboard: [[{ text: '❌ Cancel', callback_data: 'cancel' }]],
+          },
+        },
+      );
+    } catch (error) {
+      this.logger.error('Error in payment link tracking command:', error);
+      await this.telegramService.sendErrorMessage(
+        chatId,
+        'Failed to start payment link tracking. Please try again.',
+      );
+    }
+  }
+
+  // Payment Link Tracking Flow Handler
+  private async handlePaymentLinkTrackingFlow(
+    chatId: number,
+    userId: string,
+    text: string,
+    state: PaymentLinkTrackingState,
+  ) {
+    try {
+      if (state.step === 'asking_name') {
+        const paymentLinkName = text.trim();
+
+        if (!paymentLinkName) {
+          await this.telegramService.sendMessage(
+            chatId,
+            '❌ Please enter a valid payment link name.',
+          );
+          return;
+        }
+
+        // Clear the state
+        this.paymentTrackingStates.delete(userId);
+
+        // Search for payment link by name
+        await this.searchAndTrackPaymentLink(chatId, userId, paymentLinkName);
+      }
+    } catch (error) {
+      this.logger.error('Error in payment link tracking flow:', error);
+      this.paymentTrackingStates.delete(userId);
+      await this.telegramService.sendErrorMessage(
+        chatId,
+        'Failed to process payment link tracking. Please try again.',
+      );
+    }
+  }
+
+  // Search and Track Payment Link
+  private async searchAndTrackPaymentLink(
+    chatId: number,
+    userId: string,
+    linkName: string,
+  ) {
+    try {
+      // Get user's payment links matching the name
+      const paymentLinks =
+        await this.mastraService.getPaymentLinksRawData(userId);
+
+      if (!paymentLinks || paymentLinks.length === 0) {
+        await this.telegramService.sendMessage(
+          chatId,
+          `❌ <b>No Payment Links Found</b>
+
+You haven't created any payment links yet.
+Use /payment to create your first payment link!`,
+        );
+        return;
+      }
+
+      // Search for links matching the name (case-insensitive)
+      const matchingLinks = paymentLinks.filter(
+        (link) =>
+          link.title &&
+          link.title.toLowerCase().includes(linkName.toLowerCase()),
+      );
+      if (matchingLinks.length === 0) {
+        await this.telegramService.sendMessage(
+          chatId,
+          `❌ <b>Payment Link Not Found</b>
+
+No payment links found with name containing "<b>${linkName}</b>".
+
+<b>Available payment links:</b>
+${paymentLinks
+            .slice(0, 5)
+            .map((link, idx) => `${idx + 1}. ${link.title}`)
+            .join('\n')}
+
+Try using one of these names with /payment-link command.`,
+        );
+        return;
+      }
+
+      if (matchingLinks.length === 1) {
+        // Single match found - generate tracking link
+        const paymentLink = matchingLinks[0];
+        const baseUrl = process.env.BASE_URL || 'https://obverse-ui.vercel.app';
+        const trackingUrl = `${baseUrl}/transactions/${paymentLink.linkId}`;
+
+        await this.telegramService.sendMessage(
+          chatId,
+          `✅ <b>Payment Link Found!</b>
+
+🔗 <b>Name:</b> ${paymentLink.title}
+💰 <b>Amount:</b> ${paymentLink.amount} ${paymentLink.token}
+📊 <b>Status:</b> ${paymentLink.status}
+📈 <b>Transactions:</b> ${paymentLink.payments?.length || 0}
+
+🔗 <b>Transaction Tracking:</b>
+${trackingUrl}`,
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '🌐 View Transactions', url: trackingUrl },
+                  {
+                    text: '📊 Payment Stats',
+                    callback_data: `stats:${paymentLink.linkId}`,
+                  },
+                ],
+                [
+                  { text: '💰 Balance', callback_data: 'balance' },
+                  { text: '🔗 New Link', callback_data: 'payment' },
+                ],
+              ],
+            },
+          },
+        );
+      } else {
+        // Multiple matches - let user choose
+        const linkOptions = matchingLinks.slice(0, 5).map((link, idx) => [
+          {
+            text: `${idx + 1}. ${link.title} (${link.amount} ${link.token})`,
+            callback_data: `track_link:${link.linkId}`,
+          },
+        ]);
+
+        await this.telegramService.sendMessage(
+          chatId,
+          `🔍 <b>Multiple Links Found</b>
+
+Found <b>${matchingLinks.length}</b> payment links matching "<b>${linkName}</b>":
+
+Please select which one to track:`,
+          {
+            reply_markup: {
+              inline_keyboard: [
+                ...linkOptions,
+                [{ text: '❌ Cancel', callback_data: 'cancel' }],
+              ],
+            },
+          },
+        );
+      }
+    } catch (error) {
+      this.logger.error('Error searching payment links:', error);
+      await this.telegramService.sendErrorMessage(
+        chatId,
+        'Failed to search payment links. Please try again.',
+      );
+    }
+  }
+
+  // Clean up tracking state
+  public deletePaymentTrackingState(userId: string): void {
+    this.paymentTrackingStates.delete(userId);
   }
 }

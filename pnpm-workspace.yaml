@@ -1,4 +1,6 @@
 ignoredBuiltDependencies:
   - '@nestjs/core'
   - '@scarf/scarf'
+  - canvas
+  - protobufjs
   - unrs-resolver

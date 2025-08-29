@@ -60,8 +60,8 @@ export const createPaymentLinkTool = (
 
         // Generate unique link ID
         const linkId = generateLinkId();
-        const baseUrl = process.env.BASE_URL || 'https://your-domain.com';
-        const linkUrl = `${baseUrl}/preview/payment/${linkId}`;
+        const baseUrl = process.env.BASE_URL || 'https://obverse-ui.vercel.app';
+        const linkUrl = `${baseUrl}/pay/${linkId}`;
 
         // Token contract addresses
         const tokenAddresses = {
@@ -108,7 +108,7 @@ export const createPaymentLinkTool = (
         }
 
         // Generate preview image URL (the image will be served by the controller)
-        const previewImageUrl = `${baseUrl}/preview/payment/${linkId}/image`;
+        const previewImageUrl = `${baseUrl}/pay/${linkId}/image`;
 
         return {
           success: true,

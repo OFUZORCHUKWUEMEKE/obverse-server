@@ -208,13 +208,16 @@ export class MastraService {
         throw new Error('Telegram agent not initialized');
       }
 
-      return await this.telegramAgent.getPaymentLinkFullStats(linkId, telegramUserId);
+      return await this.telegramAgent.getPaymentLinkFullStats(
+        linkId,
+        telegramUserId,
+      );
     } catch (error) {
       this.logger.error('Error getting payment link full stats:', error);
       return {
         response: '❌ Failed to retrieve payment link statistics.',
         linkData: null,
-        success: false
+        success: false,
       };
     }
   }
@@ -227,21 +230,21 @@ export class MastraService {
         throw new Error('Telegram agent not initialized');
       }
 
-      return await this.telegramAgent.getAllPaymentLinksFullStats(telegramUserId);
+      return await this.telegramAgent.getAllPaymentLinksFullStats(
+        telegramUserId,
+      );
     } catch (error) {
       this.logger.error('Error getting all payment links full stats:', error);
       return {
         response: '❌ Failed to retrieve payment link statistics.',
         linksData: null,
-        success: false
+        success: false,
       };
     }
   }
 
   // Raw Data Access
-  async getPaymentLinksRawData(
-    telegramUserId: string,
-  ): Promise<any[] | null> {
+  async getPaymentLinksRawData(telegramUserId: string): Promise<any[] | null> {
     try {
       if (!this.telegramAgent) {
         throw new Error('Telegram agent not initialized');
@@ -263,7 +266,10 @@ export class MastraService {
         throw new Error('Telegram agent not initialized');
       }
 
-      return await this.telegramAgent.getPaymentLinkRawData(linkId, telegramUserId);
+      return await this.telegramAgent.getPaymentLinkRawData(
+        linkId,
+        telegramUserId,
+      );
     } catch (error) {
       this.logger.error('Error getting payment link raw data:', error);
       return null;
