@@ -1195,7 +1195,7 @@ export class MessageHandler {
 
       // Generate unique link ID
       const linkId = this.generateLinkId();
-      const linkUrl = `https://obverse-ui.vercel.app/pay/${linkId}`;
+      const linkUrl = `https://www.obverse.cc/pay/${linkId}`;
 
       // Get token contract address
       const tokenAddresses = {
@@ -1504,7 +1504,7 @@ Try using one of these names with /payment-link command.`,
       if (matchingLinks.length === 1) {
         // Single match found - generate tracking link
         const paymentLink = matchingLinks[0];
-        const baseUrl = process.env.BASE_URL || 'https://obverse-ui.vercel.app';
+        const baseUrl = process.env.BASE_URL || 'https://www.obverse.cc';
         const trackingUrl = `${baseUrl}/transactions/${paymentLink.linkId}`;
 
         await this.telegramService.sendMessage(

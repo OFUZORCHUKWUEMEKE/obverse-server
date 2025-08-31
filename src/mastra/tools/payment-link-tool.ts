@@ -60,7 +60,7 @@ export const createPaymentLinkTool = (
 
         // Generate unique link ID
         const linkId = generateLinkId();
-        const baseUrl = process.env.BASE_URL || 'https://obverse-ui.vercel.app';
+        const baseUrl = process.env.BASE_URL || 'https://www.obverse.cc';
         const linkUrl = `${baseUrl}/pay/${linkId}`;
 
         // Token contract addresses

@@ -66,7 +66,7 @@ ${testPaymentLinkData.payments.map((payment, index) => {
     return `${index + 1}. ${payment.amount} ${testPaymentLinkData.token} from ${shortAddress} on ${date}`;
   }).join('\n')}
 
-🔗 **Link URL:** https://obverse-ui.vercel.app/pay/${testPaymentLinkData.linkId}
+🔗 **Link URL:** https://www.obverse.cc/pay/${testPaymentLinkData.linkId}
   `);
   
   console.log("\n✅ Features Available:");

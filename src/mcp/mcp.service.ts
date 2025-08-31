@@ -688,7 +688,7 @@ export class McpService {
 
       // Generate unique link ID
       const linkId = this.generateLinkId();
-      const linkUrl = `https://obverse-ui.vercel.app/pay/${linkId}`;
+      const linkUrl = `https://www.obverse.cc/pay/${linkId}`;
 
       // Get token contract address
       const tokenAddresses = {

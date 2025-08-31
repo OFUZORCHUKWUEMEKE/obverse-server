@@ -74,7 +74,7 @@ Just type any of these phrases in your Telegram bot:
 2. 10.50 USDC from 0x9abc...def0 on 12/14/2024
 3. 10.50 USDC from 0x5555...4444 on 12/13/2024
 
-🔗 **Link URL:** https://obverse-ui.vercel.app/pay/ABC123XY
+🔗 **Link URL:** https://www.obverse.cc/pay/ABC123XY
 ```
 
 ## 🔒 Security Features

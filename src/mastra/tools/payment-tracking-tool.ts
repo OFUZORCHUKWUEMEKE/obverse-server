@@ -216,7 +216,7 @@ export const createPaymentTrackingTool = (
           }
 
           // Generate transaction tracking URL
-          const baseUrl = process.env.BASE_URL || 'https://obverse-ui.vercel.app';
+          const baseUrl = process.env.BASE_URL || 'https://www.obverse.cc';
           const trackingUrl = `${baseUrl}/transactions/${paymentLink.linkId}`;
 
           // Link summary

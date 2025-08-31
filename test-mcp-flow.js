@@ -81,7 +81,7 @@ const testFlow = [
       ],
       buttons: [
         [
-          { text: '🌐 Open in Browser', url: 'https://obverse-ui.vercel.app/pay/ABC123' },
+          { text: '🌐 Open in Browser', url: 'https://www.obverse.cc/pay/ABC123' },
           { text: '📋 Copy Link', data: 'copy_link_ABC123' }
         ],
         [
