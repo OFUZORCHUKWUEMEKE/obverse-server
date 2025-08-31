@@ -43,34 +43,55 @@ export const createBalanceTool = (walletService: any, paraService: any) => {
         }
 
         // Get all balances
-        const [ethBalance, mantleBalance, tokenBalances] = await Promise.all([
+        const [ethBalance, mantleBalance, baseTestnetBalance, tokenBalances, baseTestnetTokenBalances] = await Promise.all([
           paraService.getBalance(address),
           paraService.getMantleBalance(address),
+          paraService.getBaseTestnetBalance(address),
           paraService.getAllTokenBalances(address),
+          paraService.getAllBaseTestnetTokenBalances(address),
         ]);
 
         const balanceData = {
           walletAddress: address,
           nativeBalances: {
-            ETH: {
+            ETH_Sepolia: {
               balance: ethBalance.balance || '0',
               symbol: 'ETH',
+              network: 'Sepolia',
             },
-            MNT: {
+            ETH_Mantle: {
               balance: mantleBalance.formatted || '0',
-              symbol: mantleBalance.symbol || 'MNT',
+              symbol: mantleBalance.symbol || 'ETH',
+              network: 'Mantle',
+            },
+            ETH_BaseTestnet: {
+              balance: baseTestnetBalance.formatted || '0',
+              symbol: baseTestnetBalance.symbol || 'ETH',
+              network: 'Base Testnet',
             },
           },
-          tokenBalances: tokenBalances.map((token: any) => ({
-            symbol: token.symbol,
-            balance: parseFloat(token.balance).toFixed(6),
-            address: token.address,
-          })),
+          tokenBalances: {
+            sepolia: tokenBalances.map((token: any) => ({
+              symbol: token.symbol,
+              balance: parseFloat(token.balance).toFixed(6),
+              address: token.contractAddress,
+              network: 'Sepolia',
+            })),
+            baseTestnet: baseTestnetTokenBalances.map((token: any) => ({
+              symbol: token.symbol,
+              balance: parseFloat(token.balance).toFixed(6),
+              address: token.contractAddress,
+              network: 'Base Testnet',
+            })),
+          },
         };
 
         // Filter tokens if specific tokens requested
         if (tokens && tokens.length > 0) {
-          balanceData.tokenBalances = balanceData.tokenBalances.filter(
+          balanceData.tokenBalances.sepolia = balanceData.tokenBalances.sepolia.filter(
+            (token: any) => tokens.includes(token.symbol),
+          );
+          balanceData.tokenBalances.baseTestnet = balanceData.tokenBalances.baseTestnet.filter(
             (token: any) => tokens.includes(token.symbol),
           );
         }

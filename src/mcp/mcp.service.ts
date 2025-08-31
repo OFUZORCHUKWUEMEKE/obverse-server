@@ -705,7 +705,7 @@ export class McpService {
         amount: state.amount!,
         token: state.token!,
         tokenAddress: tokenAddresses[state.token!],
-        network: BlockchainNetwork.MANTLE,
+        network: BlockchainNetwork.BASE_TESTNET,
         type: PaymentLinkType.ONE_TIME,
         status: PaymentLinkStatus.ACTIVE,
         title: state.name!,
@@ -735,7 +735,7 @@ export class McpService {
         `🎉 **Payment Link Created Successfully!**\n\n` +
         `**Name:** ${state.name}\n` +
         `**Amount:** ${state.amount} ${tokenEmoji} ${state.token}\n` +
-        `**Network:** Mantle\n\n` +
+        `**Network:** Base Testnet\n\n` +
         `**Customer Details to Collect:**\n${detailsList}\n\n` +
         `**Payment Link:** ${linkUrl}\n` +
         `**Link ID:** ${linkId}\n\n` +

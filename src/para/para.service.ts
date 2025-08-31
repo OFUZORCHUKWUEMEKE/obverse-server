@@ -59,6 +59,28 @@ const mantle = defineChain({
   },
 });
 
+const baseTestnet = defineChain({
+  id: 84532,
+  name: 'Base Testnet',
+  network: 'base-testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'Ether',
+    symbol: 'ETH',
+  },
+  rpcUrls: {
+    default: {
+      http: ['https://sepolia.base.org'],
+    },
+    public: {
+      http: ['https://sepolia.base.org'],
+    },
+  },
+  blockExplorers: {
+    default: { name: 'BaseScan', url: 'https://sepolia.basescan.org' },
+  },
+});
+
 const mantleClient = createPublicClient({
   chain: mantle,
   transport: http(),
@@ -69,10 +91,21 @@ const sepoliaClient = createPublicClient({
   transport: http(),
 });
 
+const baseTestnetClient = createPublicClient({
+  chain: baseTestnet,
+  transport: http(),
+});
+
 const SEPOLIA_TOKEN_ADDRESSES = {
   USDC: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`, // Example Sepolia USDC
   USDT: '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06' as `0x${string}`, // Example Sepolia USDT
   DAI: '0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6' as `0x${string}`, // Example Sepolia DAI
+} as const;
+
+const BASE_TESTNET_TOKEN_ADDRESSES = {
+  USDC: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as `0x${string}`, // Base Testnet USDC
+  USDT: '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06' as `0x${string}`, // Base Testnet USDT (example)
+  DAI: '0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6' as `0x${string}`, // Base Testnet DAI (example)
 } as const;
 
 // Token decimals mapping (fallback for contracts that don't implement decimals properly)
@@ -82,7 +115,8 @@ const TOKEN_DECIMALS = {
   DAI: 18,
 } as const;
 
-type TokenSymbol = keyof typeof SEPOLIA_TOKEN_ADDRESSES;
+type BaseTokenSymbol = keyof typeof BASE_TESTNET_TOKEN_ADDRESSES;
+type SepoliaTokenSymbol = keyof typeof SEPOLIA_TOKEN_ADDRESSES;
 
 interface TokenBalance {
   symbol: string;
@@ -137,7 +171,7 @@ interface WalletTransactions {
 export class ParaService {
   private readonly logger = new Logger(ParaService.name);
   private readonly para: ParaServer;
-  private readonly client = sepoliaClient;
+  private readonly client = baseTestnetClient;
 
   constructor(private config: ConfigService) {
     const apiKey = 'beta_db1c28fdfd30d5074d221a26559caf95';
@@ -202,19 +236,21 @@ export class ParaService {
 
   async getBalance(address: string) {
     try {
-      this.logger.log(`Fetching ETH balance for address: ${address}`);
-      const provider = new ethers.JsonRpcProvider(
-        'https://ethereum-sepolia-rpc.publicnode.com',
-      );
-      const balance = await provider.getBalance(address);
-      const formattedBalance = ethers.formatEther(balance);
-      this.logger.log(
-        `ETH Balance fetched successfully: ${formattedBalance} ETH`,
-      );
-      return { balance: formattedBalance };
+      this.logger.log(`Fetching Base Testnet ETH balance for address: ${address}`);
+      const balance = await this.client.getBalance({
+        address: address as `0x${string}`,
+      });
+
+      this.logger.log(`Raw balance: ${balance} wei`);
+
+      // Convert to ETH
+      const balanceInETH = formatEther(balance);
+      this.logger.log(`Formatted balance: ${balanceInETH} ETH`);
+
+      return { balance: balanceInETH };
     } catch (error) {
       this.logger.error(
-        `Failed to get ETH balance for address ${address}:`,
+        `Failed to get Base Testnet ETH balance for address ${address}:`,
         error,
       );
       throw error;
@@ -248,12 +284,39 @@ export class ParaService {
     }
   }
 
+  async getBaseTestnetBalance(address: string) {
+    try {
+      this.logger.log(
+        `Fetching Base Testnet ETH balance via viem for address: ${address}`,
+      );
+      const balance = await baseTestnetClient.getBalance({
+        address: address as `0x${string}`,
+      });
+
+      this.logger.log(`Raw balance: ${balance} wei`);
+
+      // Convert to ETH
+      const balanceInETH = formatEther(balance);
+      this.logger.log(`Formatted balance: ${balanceInETH} ETH`);
+
+      return {
+        raw: balance,
+        formatted: balanceInETH,
+        symbol: 'ETH',
+        balance: balanceInETH,
+      };
+    } catch (error) {
+      this.logger.error('Error fetching Base Testnet balance via viem:', error);
+      throw error;
+    }
+  }
+
   async getTokenBalance(
     address: string,
-    tokenSymbol: TokenSymbol,
+    tokenSymbol: BaseTokenSymbol,
   ): Promise<TokenBalance> {
     try {
-      const contractAddress = SEPOLIA_TOKEN_ADDRESSES[tokenSymbol];
+      const contractAddress = BASE_TESTNET_TOKEN_ADDRESSES[tokenSymbol];
       const fallbackDecimals = TOKEN_DECIMALS[tokenSymbol];
 
       const contract = getContract({
@@ -288,7 +351,54 @@ export class ParaService {
       };
     } catch (error) {
       this.logger.error(
-        `Error fetching ${tokenSymbol} balance for ${address}:`,
+        `Error fetching ${tokenSymbol} balance for ${address} on Base Testnet:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  async getBaseTestnetTokenBalance(
+    address: string,
+    tokenSymbol: BaseTokenSymbol,
+  ): Promise<TokenBalance> {
+    try {
+      const contractAddress = BASE_TESTNET_TOKEN_ADDRESSES[tokenSymbol];
+      const fallbackDecimals = TOKEN_DECIMALS[tokenSymbol];
+
+      const contract = getContract({
+        address: contractAddress,
+        abi: erc20Abi,
+        client: baseTestnetClient,
+      });
+
+      // Get balance first
+      const balance = await contract.read.balanceOf([address as `0x${string}`]);
+
+      // Try to get decimals, fallback to predefined value if contract doesn't support it
+      let decimals: number;
+      try {
+        decimals = await contract.read.decimals();
+      } catch (decimalsError) {
+        this.logger.warn(
+          `Contract ${contractAddress} doesn't support decimals(), using fallback: ${fallbackDecimals}`,
+        );
+        decimals = fallbackDecimals;
+      }
+
+      // Format balance correctly based on actual decimals
+      const divisor = BigInt(10 ** decimals);
+      const formattedBalance = (Number(balance) / Number(divisor)).toString();
+
+      return {
+        symbol: tokenSymbol,
+        balance: formattedBalance,
+        decimals,
+        contractAddress,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error fetching ${tokenSymbol} balance for ${address} on Base Testnet:`,
         error,
       );
       throw error;
@@ -344,28 +454,56 @@ export class ParaService {
 
   async getAllTokenBalances(address: string): Promise<TokenBalance[]> {
     try {
-      this.logger.log(`Fetching all token balances for address: ${address}`);
-      const tokenSymbols: TokenSymbol[] = ['USDC', 'USDT', 'DAI'];
+      this.logger.log(`Fetching all Base Testnet token balances for address: ${address}`);
+      const tokenSymbols: BaseTokenSymbol[] = ['USDC', 'USDT', 'DAI'];
 
       const balancePromises = tokenSymbols.map((symbol) =>
         this.getTokenBalance(address, symbol).catch((error) => {
           this.logger.warn(
-            `Failed to fetch ${symbol} balance: ${error.message}`,
+            `Failed to fetch ${symbol} balance on Base Testnet: ${error.message}`,
           );
           return {
             symbol,
             balance: '0',
             decimals: TOKEN_DECIMALS[symbol] || 18,
-            contractAddress: SEPOLIA_TOKEN_ADDRESSES[symbol],
+            contractAddress: BASE_TESTNET_TOKEN_ADDRESSES[symbol],
           };
         }),
       );
 
       const results = await Promise.all(balancePromises);
-      this.logger.log(`Successfully fetched ${results.length} token balances`);
+      this.logger.log(`Successfully fetched ${results.length} Base Testnet token balances`);
       return results;
     } catch (error) {
-      this.logger.error(`Error fetching token balances for ${address}:`, error);
+      this.logger.error(`Error fetching Base Testnet token balances for ${address}:`, error);
+      throw error;
+    }
+  }
+
+  async getAllBaseTestnetTokenBalances(address: string): Promise<TokenBalance[]> {
+    try {
+      this.logger.log(`Fetching all Base testnet token balances for address: ${address}`);
+      const tokenSymbols: BaseTokenSymbol[] = ['USDC', 'USDT', 'DAI'];
+
+      const balancePromises = tokenSymbols.map((symbol) =>
+        this.getBaseTestnetTokenBalance(address, symbol).catch((error) => {
+          this.logger.warn(
+            `Failed to fetch ${symbol} balance on Base testnet: ${error.message}`,
+          );
+          return {
+            symbol,
+            balance: '0',
+            decimals: TOKEN_DECIMALS[symbol] || 18,
+            contractAddress: BASE_TESTNET_TOKEN_ADDRESSES[symbol],
+          };
+        }),
+      );
+
+      const results = await Promise.all(balancePromises);
+      this.logger.log(`Successfully fetched ${results.length} Base testnet token balances`);
+      return results;
+    } catch (error) {
+      this.logger.error(`Error fetching Base testnet token balances for ${address}:`, error);
       throw error;
     }
   }

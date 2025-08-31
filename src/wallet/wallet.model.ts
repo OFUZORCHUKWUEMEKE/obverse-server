@@ -16,6 +16,7 @@ export enum BlockchainNetwork {
   ARBITRUM = 'arbitrum',
   OPTIMISM = 'optimism',
   MANTLE = 'mantle',
+  BASE_TESTNET = 'base_testnet',
 }
 
 @Schema({
@@ -46,7 +47,7 @@ export class Wallet {
   ])
   supportedNetworks: BlockchainNetwork[];
 
-  @Prop({ default: BlockchainNetwork.ETHEREUM })
+  @Prop({ default: BlockchainNetwork.BASE_TESTNET })
   defaultNetwork: BlockchainNetwork;
 
   @Prop({ type: Object })
