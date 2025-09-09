@@ -32,6 +32,7 @@
     "@nestjs/mongoose": "^11.0.3",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/swagger": "^11.2.0",
+    "@thenamespace/offchain-manager": "^1.0.5",
     "ai": "^5.0.25",
     "axios": "^1.11.0",
     "canvas": "^3.2.0",

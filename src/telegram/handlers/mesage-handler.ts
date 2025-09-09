@@ -13,7 +13,10 @@ import {
 import { BlockchainNetwork } from 'src/wallet/wallet.model';
 import { McpService } from 'src/mcp/mcp.service';
 import { MastraService } from 'src/mastra/mastra.service';
+import { NamespaceService } from 'src/namespace/namespace.service';
 import * as QRCode from 'qrcode';
+import 'dotenv/config';
+import { createOffchainClient, ChainName } from '@thenamespace/offchain-manager';
 
 interface PaymentLinkCreationState {
   step: 'name' | 'token' | 'amount' | 'details' | 'confirm';
@@ -27,6 +30,23 @@ interface PaymentLinkCreationState {
 interface PaymentLinkTrackingState {
   step: 'asking_name';
 }
+
+// import 'dotenv/config';
+// import { createOffchainClient } from '@thenamespace/offchain-manager';
+
+// // Required: set NAMESPACE_API_KEY in your environment
+// const API_KEY = process.env.NAMESPACE_API_KEY as string;
+// if (!API_KEY) throw new Error('Missing NAMESPACE_API_KEY');
+
+// // Use 'sepolia' for testing, 'mainnet' for production
+// export const client = createOffchainClient({ 
+//   mode: 'mainnet', 
+//   timeout: 5000,
+//   defaultApiKey: API_KEY,
+// });
+
+// console.log('Offchain client initialized');
+
 
 @Injectable()
 export class MessageHandler {
@@ -43,6 +63,8 @@ export class MessageHandler {
     private paymentLinkRepository: PaymentLinkRepository,
     private mcpService: McpService,
     private mastraService: MastraService,
+    private namespaceService: NamespaceService,
+
   ) { }
 
   async handleMessage(msg: TelegramBot.Message) {
@@ -341,11 +363,16 @@ export class MessageHandler {
     }
   }
 
+
   private async handleStartCommand(
     chatId: number,
     userId: string,
     msg: TelegramBot.Message,
   ) {
+    const PARENT_NAME = 'obversecc.eth';
+    // const SUB_LABEL = 'alice'; // results in alice.obversecc.eth
+    // const OWNER_ADDRESS = '0x1234567890abcdef1234567890abcdef12345678';
+    const SUB_LABEL = msg.from?.username?.toString()
     try {
       // Check if user already has a wallet
       const telegramId = msg.from?.id.toString();
@@ -386,21 +413,44 @@ export class MessageHandler {
           );
           return;
         }
+        // Create subdomain for the user
+        let subdomain: string | null = null;
+        try {
+          if (wallet.wallet.address) {
+            subdomain = await this.namespaceService.createUserSubdomain(
+              SUB_LABEL || `user${Math.floor(Math.random() * 10000)}`,
+              wallet.wallet.address,
+              {
+                firstName: msg.from?.first_name || '',
+                lastName: msg.from?.last_name || ''
+              }
+            );
+            this.logger.log(`Created subdomain: ${subdomain} for user ${telegramId}`);
+          }
+        } catch (error) {
+          this.logger.error('Failed to create subdomain:', error);
+          // Continue without subdomain - it's not critical for wallet creation
+        }
+
         const newWallet = await this.walletRepository.create({
           userId: telegramId,
           address: wallet.wallet.address,
           paraWalletId: wallet.wallet.id,
           walletShareData: wallet.keyShare,
+          subdomain: subdomain || undefined,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
+
         this.logger.log(
-          `New wallet created for user ${telegramId}: ${newWallet.address}`,
+          `New wallet created for user ${telegramId}: ${newWallet.address}${subdomain ? ` with subdomain: ${subdomain}` : ''}`
         );
+
         const welcomeText =
-          `🎉 <b>Welcome back!</b>\n\n` +
+          `🎉 <b>Welcome to Obverse!</b>\n\n` +
           `Your wallet is ready to use.\n\n` +
           `<b>Wallet Address:</b>\n<code>${newWallet.address}</code>\n\n` +
+          (subdomain ? `<b>🌐 Your ENS Subdomain:</b>\n<code>${subdomain}</code>\n\n` : '') +
           `What would you like to do?\n\n` +
           `💰 /balance - Check your balance\n` +
           `📊 /transactions - View transaction history\n` +
@@ -426,6 +476,7 @@ export class MessageHandler {
         `🎉 <b>Welcome back!</b>\n\n` +
         `Your wallet is ready to use.\n\n` +
         `<b>Wallet Address:</b>\n<code>${exWallet?.address}</code>\n\n` +
+        (exWallet?.subdomain ? `<b>🌐 Your ENS Subdomain:</b>\n<code>${exWallet.subdomain}</code>\n\n` : '') +
         `What would you like to do?\n\n` +
         `💰 /balance - Check your balance\n` +
         `📊 /transactions - View transaction history\n` +
@@ -496,6 +547,7 @@ export class MessageHandler {
       const walletText =
         `👛 <b>Your Wallet</b>\n\n` +
         `<b>Address:</b>\n<code>${wallet.address}</code>\n\n` +
+        (wallet.subdomain ? `<b>🌐 ENS Subdomain:</b>\n<code>${wallet.subdomain}</code>\n\n` : '') +
         `<b>Status:</b> ${wallet.status}\n` +
         `<b>Networks:</b> ${wallet.supportedNetworks.join(', ')}\n` +
         `<b>Created:</b> ${wallet.createdAt?.toLocaleDateString()}\n\n` +

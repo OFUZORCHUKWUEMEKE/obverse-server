@@ -15,6 +15,7 @@ import { McpModule } from './mcp/mcp.module';
 import { MastraController } from './mastra/mastra.controller';
 import { MastraService } from './mastra/mastra.service';
 import { MastraModule } from './mastra/mastra.module';
+import { NamespaceModule } from './namespace/namespace.module';
 import leanVirtuals from 'mongoose-lean-virtuals';
 
 const config = configuration();
@@ -51,6 +52,7 @@ const config = configuration();
     ParaModule,
     McpModule,
     MastraModule,
+    NamespaceModule,
   ],
   controllers: [AppController, MastraController],
   providers: [AppService, MastraService],

@@ -83,7 +83,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           new Promise((_, reject) =>
             setTimeout(
               () => reject(new Error('Token validation timeout')),
-              10000,
+              30000, // Increased to 30 seconds
             ),
           ),
         ])) as any;

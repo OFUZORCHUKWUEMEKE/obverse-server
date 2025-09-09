@@ -77,6 +77,9 @@ export class Wallet {
   @Prop([String])
   authorizedDevices?: string[]; // Device fingerprints
 
+  @Prop()
+  subdomain?: string; // e.g emeke.obversecc.eth
+
   createdAt?: Date;
   updatedAt?: Date;
 }

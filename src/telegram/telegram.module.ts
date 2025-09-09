@@ -12,6 +12,7 @@ import { MessageHandler } from './handlers/mesage-handler';
 import { ParaModule } from 'src/para/para.module';
 import { McpModule } from 'src/mcp/mcp.module';
 import { MastraModule } from 'src/mastra/mastra.module';
+import { NamespaceModule } from 'src/namespace/namespace.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { MastraModule } from 'src/mastra/mastra.module';
     ParaModule,
     McpModule,
     MastraModule,
+    NamespaceModule,
   ],
   providers: [TelegramService, CallbackHandler, MessageHandler],
   controllers: [TelegramController],

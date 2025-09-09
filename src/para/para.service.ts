@@ -174,7 +174,7 @@ export class ParaService {
   private readonly client = baseTestnetClient;
 
   constructor(private config: ConfigService) {
-    const apiKey = 'beta_db1c28fdfd30d5074d221a26559caf95';
+    const apiKey = this.config.get<string>('PARA_API_KEY');
     const environment = this.config.get<string>('PARA_ENVIRONMENT', 'sandbox');
 
     if (!apiKey) {
@@ -203,8 +203,20 @@ export class ParaService {
       });
 
       if (hasWallet) {
-        this.logger.log(`User ${telegramId} already has a wallet.`);
-        return;
+        this.logger.log(`User ${telegramId} already has a wallet. Retrieving existing wallet.`);
+        const existingWallets = await this.para.getPregenWallets({
+          pregenId: { telegramUserId: telegramId },
+        });
+        
+        if (existingWallets && existingWallets.length > 0) {
+          const wallet = existingWallets[0];
+          const keyShare = this.para.getUserShare();
+          this.logger.log(`Retrieved existing wallet: ${wallet.address}`);
+          return { wallet, keyShare };
+        } else {
+          this.logger.warn(`User ${telegramId} has wallet flag but no wallets returned`);
+          // Continue to create new wallet as fallback
+        }
       }
       const wallet = await this.para.createPregenWallet({
         pregenId: { telegramUserId: telegramId },
