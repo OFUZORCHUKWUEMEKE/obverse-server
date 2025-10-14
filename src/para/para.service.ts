@@ -11,6 +11,18 @@ import {
   erc20Abi,
   getContract,
 } from 'viem';
+import {
+  Account,
+  RpcProvider,
+  Contract,
+  cairo,
+  uint256,
+  constants,
+  CallData,
+  stark,
+  ec,
+  hash
+} from 'starknet';
 
 // Initialize Para SDK with your API key and environment
 // const para = new ParaServer(Environment.PRODUCTION, API_KEY);
@@ -69,20 +81,23 @@ const sepoliaClient = createPublicClient({
   transport: http(),
 });
 
-const SEPOLIA_TOKEN_ADDRESSES = {
-  USDC: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`, // Example Sepolia USDC
-  USDT: '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06' as `0x${string}`, // Example Sepolia USDT
-  DAI: '0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6' as `0x${string}`, // Example Sepolia DAI
+// Starknet token addresses (Sepolia testnet)
+const STARKNET_TOKEN_ADDRESSES = {
+  ETH: '0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7',
+  STRK: '0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d',
+  USDC: '0x053b40a647cedfca6ca84f542a0fe36736031905a9639a7f19a3c1e66bfd5080',
+  USDT: '0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8',
 } as const;
 
-// Token decimals mapping (fallback for contracts that don't implement decimals properly)
+// Token decimals mapping
 const TOKEN_DECIMALS = {
+  ETH: 18,
+  STRK: 18,
   USDC: 6,
   USDT: 6,
-  DAI: 18,
 } as const;
 
-type TokenSymbol = keyof typeof SEPOLIA_TOKEN_ADDRESSES;
+type TokenSymbol = keyof typeof STARKNET_TOKEN_ADDRESSES;
 
 interface TokenBalance {
   symbol: string;
@@ -138,6 +153,8 @@ export class ParaService {
   private readonly logger = new Logger(ParaService.name);
   private readonly para: ParaServer;
   private readonly client = sepoliaClient;
+  private readonly starknetProvider: RpcProvider;
+  private readonly starknetAccounts: Map<string, Account> = new Map();
 
   constructor(private config: ConfigService) {
     const apiKey = 'beta_db1c28fdfd30d5074d221a26559caf95';
@@ -153,7 +170,14 @@ export class ParaService {
 
     this.para = new ParaServer(Environment.BETA, apiKey);
 
-    this.logger.log(`Para SDK initialized successfully`);
+    // Initialize Starknet provider (Sepolia testnet)
+    const starknetRpcUrl = this.config.get<string>(
+      'STARKNET_RPC_URL',
+      'https://starknet-sepolia.public.blastapi.io',
+    );
+    this.starknetProvider = new RpcProvider({ nodeUrl: starknetRpcUrl });
+
+    this.logger.log(`Para SDK and Starknet provider initialized successfully`);
   }
 
   // Expose Para SDK instance
@@ -163,26 +187,60 @@ export class ParaService {
 
   async createWallet(telegramId: string) {
     try {
-      this.logger.log(`Creating wallet for user ${telegramId}`);
-      const hasWallet = await this.para.hasPregenWallet({
-        pregenId: { telegramUserId: telegramId },
-      });
+      this.logger.log(`Creating Starknet wallet for user ${telegramId}`);
 
-      if (hasWallet) {
-        this.logger.log(`User ${telegramId} already has a wallet.`);
+      // Check if wallet already exists in cache
+      const existingWallet = this.starknetAccounts.get(telegramId);
+      if (existingWallet) {
+        this.logger.log(`User ${telegramId} already has a Starknet wallet.`);
         return;
       }
-      const wallet = await this.para.createPregenWallet({
-        pregenId: { telegramUserId: telegramId },
-        type: 'EVM',
-      });
-      const keyShare = this.para.getUserShare();
-      //  const keyShare = "<key_share>";
-      this.logger.log(`Wallet created successfully: ${wallet.address}`);
-      return { wallet, keyShare };
+
+      // Generate public and private key pair
+      const privateKey = stark.randomAddress();
+      this.logger.log(`New OZ account created for ${telegramId}:\nprivateKey=${privateKey.substring(0, 10)}...`);
+
+      const starkKeyPub = ec.starkCurve.getStarkKey(privateKey);
+      this.logger.log(`publicKey=${starkKeyPub.substring(0, 10)}...`);
+
+      // OpenZeppelin account class hash (v0.8.0)
+      const OZaccountClassHash = '0x061dac032f228abef9c6626f995015233097ae253a7f72d68552db02f2971b8f';
+
+      // Calculate future address of the account
+      const OZaccountConstructorCallData = CallData.compile({ publicKey: starkKeyPub });
+      const OZcontractAddress = hash.calculateContractAddressFromHash(
+        starkKeyPub,
+        OZaccountClassHash,
+        OZaccountConstructorCallData,
+        0
+      );
+      this.logger.log(`Precalculated account address=${OZcontractAddress}`);
+
+      // Create account instance
+      const account = new Account(
+        this.starknetProvider,
+        OZcontractAddress,
+        privateKey,
+        '1' // cairoVersion
+      );
+
+      // Cache the account
+      this.starknetAccounts.set(telegramId, account);
+
+      this.logger.log(`Starknet wallet created successfully: ${OZcontractAddress}`);
+
+      return {
+        wallet: {
+          address: OZcontractAddress,
+          id: telegramId,
+          publicKey: starkKeyPub,
+        },
+        keyShare: privateKey, // This should be encrypted before storing in database
+        account
+      };
     } catch (error) {
       this.logger.error(
-        `Failed to create wallet for user ${telegramId}:`,
+        `Failed to create Starknet wallet for user ${telegramId}:`,
         error,
       );
       throw error;
@@ -250,11 +308,18 @@ export class ParaService {
 
   async getTokenBalance(
     address: string,
-    tokenSymbol: TokenSymbol,
+    tokenSymbol: string,
   ): Promise<TokenBalance> {
     try {
-      const contractAddress = SEPOLIA_TOKEN_ADDRESSES[tokenSymbol];
-      const fallbackDecimals = TOKEN_DECIMALS[tokenSymbol];
+      // Legacy EVM token addresses for backward compatibility
+      const SEPOLIA_TOKEN_ADDRESSES = {
+        USDC: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`,
+        USDT: '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06' as `0x${string}`,
+        DAI: '0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6' as `0x${string}`,
+      };
+
+      const contractAddress = SEPOLIA_TOKEN_ADDRESSES[tokenSymbol as keyof typeof SEPOLIA_TOKEN_ADDRESSES];
+      const fallbackDecimals = tokenSymbol === 'DAI' ? 18 : 6;
 
       const contract = getContract({
         address: contractAddress,
@@ -345,7 +410,13 @@ export class ParaService {
   async getAllTokenBalances(address: string): Promise<TokenBalance[]> {
     try {
       this.logger.log(`Fetching all token balances for address: ${address}`);
-      const tokenSymbols: TokenSymbol[] = ['USDC', 'USDT', 'DAI'];
+      const tokenSymbols = ['USDC', 'USDT', 'DAI'];
+
+      const SEPOLIA_TOKEN_ADDRESSES = {
+        USDC: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238' as `0x${string}`,
+        USDT: '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06' as `0x${string}`,
+        DAI: '0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6' as `0x${string}`,
+      };
 
       const balancePromises = tokenSymbols.map((symbol) =>
         this.getTokenBalance(address, symbol).catch((error) => {
@@ -355,8 +426,8 @@ export class ParaService {
           return {
             symbol,
             balance: '0',
-            decimals: TOKEN_DECIMALS[symbol] || 18,
-            contractAddress: SEPOLIA_TOKEN_ADDRESSES[symbol],
+            decimals: symbol === 'DAI' ? 18 : 6,
+            contractAddress: SEPOLIA_TOKEN_ADDRESSES[symbol as keyof typeof SEPOLIA_TOKEN_ADDRESSES],
           };
         }),
       );
@@ -486,5 +557,144 @@ export class ParaService {
       `<b>Time:</b> ${timestamp.toLocaleDateString()} ${timestamp.toLocaleTimeString()}\n` +
       `<b>Token:</b> ${transfer.tokenName}`
     );
+  }
+
+  // ===== Starknet Methods =====
+
+  getStarknetProvider(): RpcProvider {
+    return this.starknetProvider;
+  }
+
+  async createStarknetWallet(telegramId: string, privateKey: string) {
+    try {
+      this.logger.log(`Creating Starknet wallet for user ${telegramId}`);
+
+      // Create Starknet account from private key
+      const account = new Account(this.starknetProvider, '0x0', privateKey);
+      const address = account.address;
+
+      // Cache the account
+      this.starknetAccounts.set(telegramId, account);
+
+      this.logger.log(`Starknet wallet created successfully: ${address}`);
+      return { address, account };
+    } catch (error) {
+      this.logger.error(
+        `Failed to create Starknet wallet for user ${telegramId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  async getStarknetAccount(telegramId: string, walletRepository?: any): Promise<Account> {
+    try {
+      // Check cache first
+      if (this.starknetAccounts.has(telegramId)) {
+        return this.starknetAccounts.get(telegramId)!;
+      }
+
+      // If not in cache, retrieve the private key from the database
+      if (!walletRepository) {
+        throw new Error('WalletRepository is required to retrieve account from database');
+      }
+
+      const wallet = await walletRepository.findOne({ userId: telegramId });
+      if (!wallet || !wallet.walletShareData) {
+        throw new Error(`No wallet found for user ${telegramId}`);
+      }
+
+      // Reconstruct the account from stored private key
+      const privateKey = wallet.walletShareData; // This should be decrypted if encrypted
+      const account = new Account(
+        this.starknetProvider,
+        wallet.address,
+        privateKey,
+        '1' // cairoVersion
+      );
+
+      // Cache the account for future use
+      this.starknetAccounts.set(telegramId, account);
+
+      this.logger.log(`Starknet account reconstructed from database for ${telegramId}`);
+      return account;
+    } catch (error) {
+      this.logger.error(`Failed to get Starknet account for ${telegramId}:`, error);
+      throw error;
+    }
+  }
+
+  async getStarknetTokenBalance(
+    address: string,
+    tokenSymbol: TokenSymbol,
+  ): Promise<TokenBalance> {
+    try {
+      const contractAddress = STARKNET_TOKEN_ADDRESSES[tokenSymbol];
+      const decimals = TOKEN_DECIMALS[tokenSymbol];
+
+      // ERC20 ABI for balanceOf
+      const erc20Abi = [
+        {
+          name: 'balanceOf',
+          type: 'function',
+          inputs: [{ name: 'account', type: 'felt' }],
+          outputs: [{ name: 'balance', type: 'Uint256' }],
+          stateMutability: 'view',
+        },
+      ];
+
+      const contract = new Contract(erc20Abi, contractAddress, this.starknetProvider);
+
+      // Call balanceOf
+      const result = await contract.balanceOf(address);
+
+      // Convert uint256 to BigInt
+      const balanceBigInt = uint256.uint256ToBN(result.balance);
+
+      // Format balance
+      const divisor = BigInt(10 ** decimals);
+      const formattedBalance = (Number(balanceBigInt) / Number(divisor)).toString();
+
+      return {
+        symbol: tokenSymbol,
+        balance: formattedBalance,
+        decimals,
+        contractAddress,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error fetching ${tokenSymbol} balance for ${address} on Starknet:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  async getAllStarknetTokenBalances(address: string): Promise<TokenBalance[]> {
+    try {
+      this.logger.log(`Fetching all Starknet token balances for address: ${address}`);
+      const tokenSymbols: TokenSymbol[] = ['ETH', 'STRK', 'USDC', 'USDT'];
+
+      const balancePromises = tokenSymbols.map((symbol) =>
+        this.getStarknetTokenBalance(address, symbol).catch((error) => {
+          this.logger.warn(
+            `Failed to fetch ${symbol} balance: ${error.message}`,
+          );
+          return {
+            symbol,
+            balance: '0',
+            decimals: TOKEN_DECIMALS[symbol] || 18,
+            contractAddress: STARKNET_TOKEN_ADDRESSES[symbol],
+          };
+        }),
+      );
+
+      const results = await Promise.all(balancePromises);
+      this.logger.log(`Successfully fetched ${results.length} Starknet token balances`);
+      return results;
+    } catch (error) {
+      this.logger.error(`Error fetching Starknet token balances for ${address}:`, error);
+      throw error;
+    }
   }
 }

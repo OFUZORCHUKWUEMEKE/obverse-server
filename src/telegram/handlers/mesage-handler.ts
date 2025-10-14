@@ -18,7 +18,7 @@ import * as QRCode from 'qrcode';
 interface PaymentLinkCreationState {
   step: 'name' | 'token' | 'amount' | 'details' | 'confirm';
   name?: string;
-  token?: 'USDC' | 'USDT' | 'DAI';
+  token?: 'ETH' | 'STRK' | 'USDC' | 'USDT';
   amount?: string;
   details?: { [key: string]: string };
   currentDetailField?: string;
@@ -562,29 +562,25 @@ export class MessageHandler {
       );
 
       this.logger.log(`Starting balance fetch for wallet: ${wallet.address}`);
-      const [ethBalance, mantleBalance, tokenBalances] = await Promise.all([
-        this.paraService.getBalance(wallet.address),
-        this.paraService.getMantleBalance(wallet.address),
-        this.paraService.getAllTokenBalances(wallet.address),
-      ]);
+      const tokenBalances = await this.paraService.getAllStarknetTokenBalances(wallet.address);
       this.logger.log(
-        `Balance fetch completed. ETH: ${ethBalance.balance}, Mantle: ${mantleBalance.formatted}, Tokens: ${tokenBalances.length} items`,
+        `Balance fetch completed. Tokens: ${tokenBalances.length} items`,
       );
 
       let balanceText =
-        `💰 <b>Your Wallet Balance</b>\n\n` +
-        `<b>🔷 ETH:</b> ${ethBalance.balance || '0'} ETH\n` +
-        `<b>🟢 MNT:</b> ${mantleBalance.formatted || '0'} ${mantleBalance.symbol || 'MNT'}\n\n` +
+        `💰 <b>Your Starknet Wallet Balance</b>\n\n` +
         `<b>🪙 Token Balances:</b>\n`;
 
       // Add token balances
       for (const token of tokenBalances) {
         const emoji =
-          token.symbol === 'USDC'
-            ? '🔵'
-            : token.symbol === 'USDT'
-              ? '🟢'
-              : '🟡';
+          token.symbol === 'ETH'
+            ? '🔷'
+            : token.symbol === 'STRK'
+              ? '⭐'
+              : token.symbol === 'USDC'
+                ? '🔵'
+                : '🟢';
         const balance = parseFloat(token.balance).toFixed(6);
         balanceText += `${emoji} <b>${token.symbol}:</b> ${balance}\n`;
       }
@@ -714,9 +710,9 @@ export class MessageHandler {
           `<b>Usage:</b> <code>/send &lt;amount&gt; &lt;token&gt; &lt;address&gt; [memo]</code>\n\n` +
           `<b>Examples:</b>\n` +
           `• <code>/send 10 USDC 0x123...abc</code>\n` +
-          `• <code>/send 0.5 MNT 0x456...def Payment for coffee</code>\n` +
+          `• <code>/send 0.5 ETH 0x456...def Payment for coffee</code>\n` +
           `• <code>/send 100 USDT 0x789...ghi Monthly subscription</code>\n\n` +
-          `<b>Supported tokens:</b> MNT, USDC, USDT, DAI\n\n` +
+          `<b>Supported tokens:</b> ETH, STRK, USDC, USDT\n\n` +
           `<i>Note: The address must be a valid Ethereum address</i>`,
           {
             reply_markup: {
@@ -738,7 +734,7 @@ export class MessageHandler {
       const memo = args.slice(3).join(' ') || '';
 
       // Validate token
-      const validTokens = ['MNT', 'USDC', 'USDT', 'DAI'];
+      const validTokens = ['ETH', 'STRK', 'USDC', 'USDT'];
       if (!validTokens.includes(token)) {
         await this.telegramService.sendMessage(
           chatId,
@@ -967,10 +963,13 @@ export class MessageHandler {
         reply_markup: {
           inline_keyboard: [
             [
+              { text: '🔷 ETH', callback_data: 'payment_token_ETH' },
+              { text: '⭐ STRK', callback_data: 'payment_token_STRK' },
+            ],
+            [
               { text: '🔵 USDC', callback_data: 'payment_token_USDC' },
               { text: '🟢 USDT', callback_data: 'payment_token_USDT' },
             ],
-            [{ text: '🟡 DAI', callback_data: 'payment_token_DAI' }],
           ],
         },
       },
@@ -985,22 +984,22 @@ export class MessageHandler {
     text: string,
     state: PaymentLinkCreationState,
   ) {
-    const validTokens = ['USDC', 'USDT', 'DAI'];
+    const validTokens = ['ETH', 'STRK', 'USDC', 'USDT'];
     const upperText = text.toUpperCase();
 
     if (!validTokens.includes(upperText)) {
       await this.telegramService.sendMessage(
         chatId,
-        '❌ Invalid token. Please choose USDC, USDT, or DAI.',
+        '❌ Invalid token. Please choose ETH, STRK, USDC, or USDT.',
       );
       return;
     }
 
-    state.token = upperText as 'USDC' | 'USDT' | 'DAI';
+    state.token = upperText as 'ETH' | 'STRK' | 'USDC' | 'USDT';
     state.step = 'amount';
 
     const tokenEmoji =
-      upperText === 'USDC' ? '🔵' : upperText === 'USDT' ? '🟢' : '🟡';
+      upperText === 'ETH' ? '🔷' : upperText === 'STRK' ? '⭐' : upperText === 'USDC' ? '🔵' : '🟢';
 
     await this.telegramService.sendMessage(
       chatId,
@@ -1197,11 +1196,12 @@ export class MessageHandler {
       const linkId = this.generateLinkId();
       const linkUrl = `https://obverse-ui.vercel.app/pay/${linkId}`;
 
-      // Get token contract address
+      // Get token contract address (Starknet Sepolia testnet)
       const tokenAddresses = {
-        USDC: '0x09Bc4E0D864854c6aFB6eB9A9cdF58ac190D0dF9',
-        USDT: '0x201EBa5CC46D216Ce6DC03F6a759e8E766e956Ae',
-        DAI: '0xdA10009cBd5D07dd0CeCc66161FC93D7c9000da1',
+        ETH: '0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7',
+        STRK: '0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d',
+        USDC: '0x053b40a647cedfca6ca84f542a0fe36736031905a9639a7f19a3c1e66bfd5080',
+        USDT: '0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8',
       };
 
       const paymentLink = await this.paymentLinkRepository.create({
@@ -1212,7 +1212,7 @@ export class MessageHandler {
         amount: state.amount,
         token: state.token,
         tokenAddress: tokenAddresses[state.token!],
-        network: BlockchainNetwork.MANTLE,
+        network: BlockchainNetwork.STARKNET,
         type: PaymentLinkType.ONE_TIME,
         status: PaymentLinkStatus.ACTIVE,
         title: state.name!,
@@ -1357,29 +1357,21 @@ export class MessageHandler {
       return '❌ No balance data available';
     }
 
-    let balanceText = `💰 <b>Your Wallet Balance</b>\n\n`;
+    let balanceText = `💰 <b>Your Starknet Wallet Balance</b>\n\n`;
 
-    // Native balances
-    if (balanceData.nativeBalances) {
-      if (balanceData.nativeBalances.ETH) {
-        balanceText += `<b>🔷 ETH:</b> ${balanceData.nativeBalances.ETH.balance} ETH\n`;
-      }
-      if (balanceData.nativeBalances.MNT) {
-        balanceText += `<b>🟢 MNT:</b> ${balanceData.nativeBalances.MNT.balance} ${balanceData.nativeBalances.MNT.symbol}\n`;
-      }
-    }
-
-    // Token balances
+    // Token balances (Starknet)
     if (balanceData.tokenBalances && balanceData.tokenBalances.length > 0) {
-      balanceText += `\n<b>🪙 Token Balances:</b>\n`;
+      balanceText += `<b>🪙 Token Balances:</b>\n`;
 
       for (const token of balanceData.tokenBalances) {
         const emoji =
-          token.symbol === 'USDC'
-            ? '🔵'
-            : token.symbol === 'USDT'
-              ? '🟢'
-              : '🟡';
+          token.symbol === 'ETH'
+            ? '🔷'
+            : token.symbol === 'STRK'
+              ? '⭐'
+              : token.symbol === 'USDC'
+                ? '🔵'
+                : '🟢';
         balanceText += `${emoji} <b>${token.symbol}:</b> ${token.balance}\n`;
       }
     }

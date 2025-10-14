@@ -12,7 +12,7 @@ export class WalletService {
   constructor(
     @InjectModel(Wallet.name) private walletModel: Model<WalletDocument>,
     private paraService: ParaService,
-  ) {}
+  ) { }
 
   async getWalletBalance(address: string, tokens?: string[]) {
     try {

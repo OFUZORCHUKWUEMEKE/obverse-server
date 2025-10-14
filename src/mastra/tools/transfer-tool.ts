@@ -1,61 +1,23 @@
 import { Tool } from '@mastra/core';
 import { z } from 'zod';
-import { ethers } from 'ethers';
-import {
-  createWalletClient,
-  http,
-  parseEther,
-  parseUnits,
-  formatEther,
-  formatUnits,
-  isAddress,
-  getContract,
-} from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
-import { mantle } from 'viem/chains';
+import { Account, CallData, cairo, uint256, RpcProvider, validateAndParseAddress } from 'starknet';
 
-const erc20Abi = [
-  {
-    constant: true,
-    inputs: [{ name: '_owner', type: 'address' }],
-    name: 'balanceOf',
-    outputs: [{ name: 'balance', type: 'uint256' }],
-    type: 'function',
-  },
-  {
-    constant: false,
-    inputs: [
-      { name: '_to', type: 'address' },
-      { name: '_value', type: 'uint256' },
-    ],
-    name: 'transfer',
-    outputs: [{ name: '', type: 'bool' }],
-    type: 'function',
-  },
-  {
-    constant: true,
-    inputs: [],
-    name: 'decimals',
-    outputs: [{ name: '', type: 'uint8' }],
-    type: 'function',
-  },
-] as const;
-
-// Token contract addresses on Mantle network
+// Token contract addresses on Starknet Sepolia testnet
 const TOKEN_ADDRESSES = {
-  USDC: '0x09Bc4E0D864854c6aFB6eB9A9cdF58ac190D0dF9' as `0x${string}`,
-  USDT: '0x201EBa5CC46D216Ce6DC03F6a759e8E766e956Ae' as `0x${string}`,
-  DAI: '0xdA10009cBd5D07dd0CeCc66161FC93D7c9000da1' as `0x${string}`,
+  ETH: '0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7',
+  STRK: '0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d',
+  USDC: '0x053b40a647cedfca6ca84f542a0fe36736031905a9639a7f19a3c1e66bfd5080',
+  USDT: '0x068f5c6a61780768455de69077e07e89787839bf8166decfbf92b645209c0fb8',
 } as const;
 
 const TOKEN_DECIMALS = {
+  ETH: 18,
+  STRK: 18,
   USDC: 6,
   USDT: 6,
-  DAI: 18,
-  MNT: 18,
 } as const;
 
-type TokenSymbol = keyof typeof TOKEN_ADDRESSES | 'MNT';
+type TokenSymbol = keyof typeof TOKEN_ADDRESSES;
 
 interface TransferResult {
   success: boolean;
@@ -89,17 +51,17 @@ export const createTransferTool = (
   return new Tool({
     id: 'transfer_tokens',
     description:
-      'Transfer MNT or stablecoins (USDC, USDT, DAI) to another address',
+      'Transfer ETH, STRK or stablecoins (USDC, USDT) on Starknet to another address',
     inputSchema: z.object({
       telegramUserId: z.string().describe('Telegram user ID of the sender'),
       toAddress: z
         .string()
         .describe(
-          'Destination wallet address (must be valid Ethereum address)',
+          'Destination wallet address (must be valid Starknet address)',
         ),
       amount: z.string().describe("Amount to transfer (e.g., '10.5', '100')"),
       token: z
-        .enum(['MNT', 'USDC', 'USDT', 'DAI'])
+        .enum(['ETH', 'STRK', 'USDC', 'USDT'])
         .describe('Token type to transfer'),
       memo: z
         .string()
@@ -152,6 +114,7 @@ export const createTransferTool = (
           parsedAmount,
           token as TokenSymbol,
           paraService,
+          walletRepository,
         );
 
         if (!transferResult.success) {
@@ -179,7 +142,7 @@ export const createTransferTool = (
           console.error('Failed to record transaction in database:', dbError);
         }
 
-        const explorerUrl = `https://explorer.mantle.xyz/tx/${transferResult.transactionHash}`;
+        const explorerUrl = `https://sepolia.starkscan.co/tx/${transferResult.transactionHash}`;
 
         return {
           success: true,
@@ -190,7 +153,7 @@ export const createTransferTool = (
             toAddress: normalizedToAddress,
             amount,
             token,
-            gasUsed: transferResult.gasUsed,
+            // gasUsed: transferResult.gasUsed,
             confirmationUrl: explorerUrl,
           },
         };
@@ -233,12 +196,14 @@ async function validateTransferInputs(
     };
   }
 
-  // Validate destination address
-  if (!isAddress(toAddress)) {
+  // Validate destination address (Starknet address validation)
+  try {
+    validateAndParseAddress(toAddress);
+  } catch (e) {
     return {
       isValid: false,
       error:
-        'Invalid destination address. Please provide a valid Ethereum address.',
+        'Invalid destination address. Please provide a valid Starknet address.',
     };
   }
 
@@ -263,10 +228,10 @@ async function validateTransferInputs(
 
   // Check minimum transfer amounts
   const minimumAmounts = {
-    MNT: 0.001,
+    ETH: 0.0001,
+    STRK: 0.1,
     USDC: 0.01,
     USDT: 0.01,
-    DAI: 0.01,
   };
 
   if (parsedAmount < minimumAmounts[token]) {
@@ -280,16 +245,12 @@ async function validateTransferInputs(
   try {
     let balance: number = 0;
 
-    if (token === 'MNT') {
-      const mantleBalance = await paraService.getMantleBalance(wallet.address);
-      balance = parseFloat(mantleBalance.formatted);
-    } else {
-      const tokenBalance = await paraService.getTokenBalance(
-        wallet.address,
-        token,
-      );
-      balance = parseFloat(tokenBalance.balance);
-    }
+    // Get token balance from Starknet
+    const tokenBalance = await paraService.getStarknetTokenBalance(
+      wallet.address,
+      token,
+    );
+    balance = parseFloat(tokenBalance.balance);
 
     if (balance < parsedAmount) {
       return {
@@ -298,25 +259,28 @@ async function validateTransferInputs(
       };
     }
 
-    // Reserve some amount for gas fees (for MNT)
-    if (token === 'MNT') {
-      const gasReserve = 0.01; // Reserve 0.01 MNT for gas
+    // Reserve some amount for gas fees (for ETH or STRK)
+    if (token === 'ETH' || token === 'STRK') {
+      const gasReserve = token === 'ETH' ? 0.001 : 0.5; // Reserve for gas
       if (balance - parsedAmount < gasReserve) {
         return {
           isValid: false,
-          error: `Insufficient balance for gas fees. Please keep at least ${gasReserve} MNT for transaction fees.`,
+          error: `Insufficient balance for gas fees. Please keep at least ${gasReserve} ${token} for transaction fees.`,
         };
       }
     } else {
-      // For token transfers, check if user has enough MNT for gas
-      const mantleBalance = await paraService.getMantleBalance(wallet.address);
-      const mntBalance = parseFloat(mantleBalance.formatted);
-      const gasReserve = 0.001; // Reserve 0.001 MNT for gas
+      // For token transfers, check if user has enough STRK for gas
+      const strkBalance = await paraService.getStarknetTokenBalance(
+        wallet.address,
+        'STRK',
+      );
+      const balance = parseFloat(strkBalance.balance);
+      const gasReserve = 0.5; // Reserve STRK for gas
 
-      if (mntBalance < gasReserve) {
+      if (balance < gasReserve) {
         return {
           isValid: false,
-          error: `Insufficient MNT balance for gas fees. You need at least ${gasReserve} MNT to send ${token} tokens.`,
+          error: `Insufficient STRK balance for gas fees. You need at least ${gasReserve} STRK to send ${token} tokens.`,
         };
       }
     }
@@ -342,18 +306,11 @@ async function executeTransfer(
   amount: number,
   token: TokenSymbol,
   paraService: any,
+  walletRepository: any,
 ) {
   try {
-    // Get Para SDK instance and wallet info
-    const para = paraService.getInstance();
-
-    if (token === 'MNT') {
-      // Native MNT transfer
-      return await transferMNT(para, wallet, toAddress, amount);
-    } else {
-      // ERC20 token transfer
-      return await transferERC20Token(para, wallet, toAddress, amount, token);
-    }
+    // Use Starknet RPC to execute transfer
+    return await transferStarknetToken(paraService, wallet, toAddress, amount, token, walletRepository);
   } catch (error) {
     console.error('Execute transfer error:', error);
     throw new Error(
@@ -362,103 +319,55 @@ async function executeTransfer(
   }
 }
 
-async function transferMNT(
-  para: any,
-  wallet: any,
-  toAddress: string,
-  amount: number,
-) {
-  try {
-    // Use Para SDK to send native MNT
-    const amountWei = parseEther(amount.toString());
-
-    const transaction = await para.sendTransaction({
-      pregenId: { telegramUserId: wallet.userId },
-      transaction: {
-        to: toAddress,
-        value: amountWei.toString(),
-        data: '0x',
-      },
-    });
-
-    return {
-      success: true,
-      transactionHash: transaction.hash,
-      gasUsed: transaction.gasUsed?.toString(),
-      error: null,
-    };
-  } catch (error) {
-    console.error('MNT transfer error:', error);
-    return {
-      success: false,
-      error: `MNT transfer failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      transactionHash: null,
-      gasUsed: null,
-    };
-  }
-}
-
-async function transferERC20Token(
-  para: any,
+async function transferStarknetToken(
+  paraService: any,
   wallet: any,
   toAddress: string,
   amount: number,
   token: TokenSymbol,
+  walletRepository: any,
 ) {
   try {
-    const tokenAddress = TOKEN_ADDRESSES[token as keyof typeof TOKEN_ADDRESSES];
-    const decimals = TOKEN_DECIMALS[token as keyof typeof TOKEN_DECIMALS];
+    const tokenAddress = TOKEN_ADDRESSES[token];
+    const decimals = TOKEN_DECIMALS[token];
 
-    // Parse amount with correct decimals
-    const amountBN = parseUnits(amount.toString(), decimals);
+    // Convert amount to uint256 with proper decimals
+    const amountInSmallestUnit = BigInt(Math.floor(amount * Math.pow(10, decimals)));
+    const amountUint256 = uint256.bnToUint256(amountInSmallestUnit);
 
-    // Build ERC20 transfer transaction data
-    const transferData = encodeFunctionCall(
-      'transfer',
-      ['address', 'uint256'],
-      [toAddress, amountBN.toString()],
-    );
+    // Get Starknet account from paraService (with wallet repository for retrieval)
+    const account = await paraService.getStarknetAccount(wallet.userId, walletRepository);
 
-    const transaction = await para.sendTransaction({
-      pregenId: { telegramUserId: wallet.userId },
-      transaction: {
-        to: tokenAddress,
-        value: '0',
-        data: transferData,
-      },
-    });
+    // Build transfer call
+    const transferCall = {
+      contractAddress: tokenAddress,
+      entrypoint: 'transfer',
+      calldata: CallData.compile({
+        recipient: toAddress,
+        amount: amountUint256,
+      }),
+    };
+
+    // Execute the transaction
+    const result = await account.execute(transferCall);
+
+    // Wait for transaction to be accepted
+    await paraService.getStarknetProvider().waitForTransaction(result.transaction_hash);
 
     return {
       success: true,
-      transactionHash: transaction.hash,
-      gasUsed: transaction.gasUsed?.toString(),
+      transactionHash: result.transaction_hash,
+      gasUsed: null, // Starknet gas calculation is different
       error: null,
     };
   } catch (error) {
-    console.error('ERC20 transfer error:', error);
+    console.error('Starknet transfer error:', error);
     return {
       success: false,
       error: `${token} transfer failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       transactionHash: null,
       gasUsed: null,
     };
-  }
-}
-
-function encodeFunctionCall(
-  functionName: string,
-  types: string[],
-  values: any[],
-): string {
-  try {
-    const iface = new ethers.Interface([
-      `function ${functionName}(${types.join(',')}) returns (bool)`,
-    ]);
-    return iface.encodeFunctionData(functionName, values);
-  } catch (error) {
-    throw new Error(
-      `Failed to encode function call: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    );
   }
 }
 
@@ -479,14 +388,11 @@ async function recordTransaction(
     status: 'COMPLETED',
     amount: parseFloat(amount),
     token,
-    tokenAddress:
-      token === 'MNT'
-        ? null
-        : TOKEN_ADDRESSES[token as keyof typeof TOKEN_ADDRESSES],
+    tokenAddress: TOKEN_ADDRESSES[token as keyof typeof TOKEN_ADDRESSES],
     fromAddress: wallet.address,
     toAddress,
     transactionHash,
-    network: 'MANTLE',
+    network: 'STARKNET',
     gasUsed: null, // Will be updated when transaction is confirmed
     metadata: {
       source: 'transfer_tool',

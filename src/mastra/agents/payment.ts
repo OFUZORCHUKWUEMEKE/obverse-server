@@ -627,7 +627,7 @@ Or: "Create payment link for Service $10 USDT collect name,address,notes"`;
     telegramUserId: string,
     toAddress: string,
     amount: string,
-    token: 'MNT' | 'USDC' | 'USDT' | 'DAI',
+    token: 'ETH' | 'STRK' | 'USDC' | 'USDT',
     memo?: string,
   ) {
     try {
@@ -648,7 +648,7 @@ Or: "Create payment link for Service $10 USDT collect name,address,notes"`;
     telegramUserId: string,
     toAddress: string,
     amount: string,
-    token: 'MNT' | 'USDC' | 'USDT' | 'DAI',
+    token: 'ETH' | 'STRK' | 'USDC' | 'USDT',
     memo?: string,
   ): Promise<string> {
     try {

@@ -166,7 +166,7 @@ export class MastraService {
     telegramUserId: string,
     toAddress: string,
     amount: string,
-    token: 'MNT' | 'USDC' | 'USDT' | 'DAI',
+    token: 'ETH' | 'STRK' | 'USDC' | 'USDT',
     memo?: string,
   ): Promise<string> {
     try {

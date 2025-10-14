@@ -44,7 +44,7 @@ export interface McpToolResult {
 interface PaymentLinkCreationState {
   step: 'name' | 'token' | 'amount' | 'details' | 'confirm';
   name?: string;
-  token?: 'USDC' | 'USDT' | 'DAI';
+  token?: 'ETH' | 'STRK' | 'USDC' | 'USDT';
   amount?: string;
   details?: { [key: string]: string };
   currentDetailField?: string;
@@ -424,7 +424,7 @@ export class McpService {
       };
     }
 
-    state.token = upperText as 'USDC' | 'USDT' | 'DAI';
+    state.token = upperText as 'ETH' | 'STRK' | 'USDC' | 'USDT';
     state.step = 'amount';
     this.paymentCreationStates.set(userId, state);
 
@@ -705,7 +705,7 @@ export class McpService {
         amount: state.amount!,
         token: state.token!,
         tokenAddress: tokenAddresses[state.token!],
-        network: BlockchainNetwork.MANTLE,
+        network: BlockchainNetwork.STARKNET,
         type: PaymentLinkType.ONE_TIME,
         status: PaymentLinkStatus.ACTIVE,
         title: state.name!,

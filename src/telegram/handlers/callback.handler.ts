@@ -112,26 +112,22 @@ export class CallbackHandler {
         '⏳ Fetching your balances...',
       );
 
-      const [ethBalance, mantleBalance, tokenBalances] = await Promise.all([
-        this.paraService.getBalance(wallet.address),
-        this.paraService.getMantleBalance(wallet.address),
-        this.paraService.getAllTokenBalances(wallet.address),
-      ]);
+      const tokenBalances = await this.paraService.getAllStarknetTokenBalances(wallet.address);
 
       let balanceText =
-        `💰 <b>Your Wallet Balance</b>\n\n` +
-        `<b>🔷 ETH:</b> ${ethBalance.balance || '0'} ETH\n` +
-        `<b>🟢 MNT:</b> ${mantleBalance.formatted || '0'} ${mantleBalance.symbol || 'MNT'}\n\n` +
+        `💰 <b>Your Starknet Wallet Balance</b>\n\n` +
         `<b>🪙 Token Balances:</b>\n`;
 
       // Add token balances
       for (const token of tokenBalances) {
         const emoji =
-          token.symbol === 'USDC'
-            ? '🔵'
-            : token.symbol === 'USDT'
-              ? '🟢'
-              : '🟡';
+          token.symbol === 'ETH'
+            ? '🔷'
+            : token.symbol === 'STRK'
+              ? '⭐'
+              : token.symbol === 'USDC'
+                ? '🔵'
+                : '🟢';
         const balance = parseFloat(token.balance).toFixed(6);
         balanceText += `${emoji} <b>${token.symbol}:</b> ${balance}\n`;
       }
@@ -241,9 +237,9 @@ export class CallbackHandler {
       `<b>Usage:</b> <code>/send &lt;amount&gt; &lt;token&gt; &lt;address&gt; [memo]</code>\n\n` +
       `<b>Examples:</b>\n` +
       `• <code>/send 10 USDC 0x123...abc</code>\n` +
-      `• <code>/send 0.5 MNT 0x456...def Payment for coffee</code>\n` +
+      `• <code>/send 0.5 ETH 0x456...def Payment for coffee</code>\n` +
       `• <code>/send 100 USDT 0x789...ghi Monthly subscription</code>\n\n` +
-      `<b>Supported tokens:</b> MNT, USDC, USDT, DAI\n\n` +
+      `<b>Supported tokens:</b> ETH, STRK, USDC, USDT\n\n` +
       `<i>Note: The address must be a valid Ethereum address</i>`,
       {
         reply_markup: {
@@ -517,7 +513,7 @@ export class CallbackHandler {
         userId,
         toAddress,
         amount,
-        token as 'MNT' | 'USDC' | 'USDT' | 'DAI',
+        token as 'ETH' | 'STRK' | 'USDC' | 'USDT',
         memo,
       );
 
