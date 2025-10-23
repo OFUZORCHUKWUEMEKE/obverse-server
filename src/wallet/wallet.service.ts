@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Wallet, WalletDocument } from './wallet.model';
 import { ParaService } from '../para/para.service';
+import { PrivyService } from '../para/privy.service';
 import { WalletBalanceResponseDto } from './dto/balance.dto';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class WalletService {
   constructor(
     @InjectModel(Wallet.name) private walletModel: Model<WalletDocument>,
     private paraService: ParaService,
+    private privyService: PrivyService,
   ) {}
 
   async getWalletBalance(address: string, tokens?: string[]) {

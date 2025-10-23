@@ -2,6 +2,7 @@ import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import TelegramBot from 'node-telegram-bot-api';
 import { TelegramService } from '../telegram.service';
 import { ParaService } from 'src/para/para.service';
+import { PrivyService } from 'src/para/privy.service';
 import { MessageHandler } from './mesage-handler';
 import { PaymentLinkRepository } from 'src/payment-link/payment-repository';
 import { Types } from 'mongoose';
@@ -16,12 +17,13 @@ export class CallbackHandler {
     @Inject(forwardRef(() => TelegramService))
     private telegramBotService: TelegramService,
     private paraService: ParaService,
+    private privyService: PrivyService,
     @Inject(forwardRef(() => MessageHandler))
     private messageHandler: MessageHandler,
     private paymentLinkRepository: PaymentLinkRepository,
     private walletRepository: WalletRepository,
     private mastraService: MastraService,
-  ) { }
+  ) {}
 
   async handleCallback(callbackQuery: TelegramBot.CallbackQuery) {
     const chatId = callbackQuery.message?.chat.id;
@@ -99,7 +101,7 @@ export class CallbackHandler {
   private async handleBalanceCallback(chatId: number, userId: string) {
     try {
       const wallet = await this.walletRepository.findOne({ userId });
-      if (!wallet?.address) {
+      if (!wallet) {
         await this.telegramBotService.sendMessage(
           chatId,
           '❌ No wallet found. Use /start to create a wallet.',
@@ -112,6 +114,73 @@ export class CallbackHandler {
         '⏳ Fetching your balances...',
       );
 
+      // Check if this is a Privy wallet or legacy Para wallet
+      if (wallet.solanaAddress && wallet.arbitrumAddress) {
+        // Privy wallet - fetch Solana and Arbitrum balances
+        this.logger.log(`Fetching balances for Privy wallet: Solana ${wallet.solanaAddress}, Arbitrum ${wallet.arbitrumAddress}`);
+
+        const [solBalance, arbBalance, solanaTokens, arbTokens] = await Promise.all([
+          this.privyService.getSolanaBalance(wallet.solanaAddress),
+          this.privyService.getArbitrumBalance(wallet.arbitrumAddress),
+          this.privyService.getAllSolanaTokenBalances(wallet.solanaAddress),
+          this.privyService.getAllArbitrumTokenBalances(wallet.arbitrumAddress),
+        ]);
+
+        this.logger.log(`Balance fetch completed. SOL: ${solBalance.balance}, ETH: ${arbBalance.balance}`);
+
+        let balanceText =
+          `💰 <b>Your Multi-Chain Wallet Balance</b>\n\n` +
+          `<b>🟣 Solana Network:</b>\n` +
+          `<b>SOL:</b> ${solBalance.balance || '0'} SOL\n`;
+
+        // Add Solana token balances
+        for (const token of solanaTokens) {
+          const emoji = token.symbol === 'USDC' ? '🔵' : token.symbol === 'USDT' ? '🟢' : '🟡';
+          const balance = parseFloat(token.balance).toFixed(6);
+          balanceText += `${emoji} <b>${token.symbol}:</b> ${balance}\n`;
+        }
+
+        balanceText += `\n<b>🔷 Arbitrum Network:</b>\n` + `<b>ETH:</b> ${arbBalance.balance || '0'} ETH\n`;
+
+        // Add Arbitrum token balances
+        for (const token of arbTokens) {
+          const emoji = token.symbol === 'USDC' ? '🔵' : token.symbol === 'USDT' ? '🟢' : '🟡';
+          const balance = parseFloat(token.balance).toFixed(6);
+          balanceText += `${emoji} <b>${token.symbol}:</b> ${balance}\n`;
+        }
+
+        balanceText +=
+          `\n<b>📍 Wallet Addresses:</b>\n` +
+          `<b>Solana:</b> <code>${wallet.solanaAddress}</code>\n` +
+          `<b>Arbitrum:</b> <code>${wallet.arbitrumAddress}</code>`;
+
+        await this.telegramBotService.sendMessage(chatId, balanceText, {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '🔄 Refresh', callback_data: 'balance' },
+                { text: '💸 Send', callback_data: 'send' },
+              ],
+              [
+                { text: '📊 Transactions', callback_data: 'transactions' },
+                { text: '🔗 Payment Link', callback_data: 'payment' },
+              ],
+            ],
+          },
+        });
+        return;
+      }
+
+      // Legacy Para wallet support
+      if (!wallet.address) {
+        await this.telegramBotService.sendMessage(
+          chatId,
+          '❌ Wallet address not found. Use /start to create a wallet.',
+        );
+        return;
+      }
+
+      this.logger.log(`Fetching balances for legacy Para wallet: ${wallet.address}`);
       const [ethBalance, mantleBalance, tokenBalances] = await Promise.all([
         this.paraService.getBalance(wallet.address),
         this.paraService.getMantleBalance(wallet.address),
@@ -164,10 +233,76 @@ export class CallbackHandler {
   private async handleTransactionsCallback(chatId: number, userId: string) {
     try {
       const wallet = await this.walletRepository.findOne({ userId });
-      if (!wallet?.address) {
+      if (!wallet) {
         await this.telegramBotService.sendMessage(
           chatId,
           '❌ No wallet found. Use /start to create a wallet.',
+        );
+        return;
+      }
+
+      // Check if this is a Privy wallet
+      if (wallet.solanaAddress && wallet.arbitrumAddress) {
+        await this.telegramBotService.sendMessage(
+          chatId,
+          '⏳ Loading your transactions...',
+        );
+
+        const [solanaTransactions] = await Promise.all([
+          this.privyService.getSolanaTransactions(wallet.solanaAddress, 5),
+        ]);
+
+        let transactionText = `📊 <b>Recent Transactions</b>\n\n`;
+
+        // Show Solana transactions
+        if (solanaTransactions.length > 0) {
+          transactionText += `<b>🟣 Solana Transactions:</b>\n\n`;
+          solanaTransactions.forEach((tx, index) => {
+            const statusEmoji = tx.status === 'success' ? '✅' : '❌';
+            const date = tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleDateString() : 'N/A';
+            transactionText += `${index + 1}. ${statusEmoji} ${date}\n`;
+            transactionText += `   Signature: <code>${tx.signature.substring(0, 16)}...</code>\n`;
+            transactionText += `   Fee: ${tx.fee} SOL\n\n`;
+          });
+        }
+
+        if (solanaTransactions.length === 0) {
+          transactionText += `No recent transactions found.\n\n`;
+        }
+
+        transactionText += `<b>📍 Wallet Addresses:</b>\n`;
+        transactionText += `<b>Solana:</b> <code>${wallet.solanaAddress}</code>\n`;
+        transactionText += `<b>Arbitrum:</b> <code>${wallet.arbitrumAddress}</code>`;
+
+        await this.telegramBotService.sendMessage(chatId, transactionText, {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '🔄 Refresh', callback_data: 'transactions' },
+                { text: '💰 Balance', callback_data: 'balance' },
+              ],
+              [
+                {
+                  text: '🟣 Solana Explorer',
+                  url: `https://explorer.solana.com/address/${wallet.solanaAddress}?cluster=devnet`,
+                },
+              ],
+              [
+                {
+                  text: '🔷 Arbitrum Explorer',
+                  url: `https://sepolia.arbiscan.io/address/${wallet.arbitrumAddress}`,
+                },
+              ],
+            ],
+          },
+        });
+        return;
+      }
+
+      if (!wallet.address) {
+        await this.telegramBotService.sendMessage(
+          chatId,
+          '❌ Wallet address not found.',
         );
         return;
       }
@@ -238,13 +373,13 @@ export class CallbackHandler {
     await this.telegramBotService.sendMessage(
       chatId,
       `💸 <b>Send Tokens</b>\n\n` +
-      `<b>Usage:</b> <code>/send &lt;amount&gt; &lt;token&gt; &lt;address&gt; [memo]</code>\n\n` +
-      `<b>Examples:</b>\n` +
-      `• <code>/send 10 USDC 0x123...abc</code>\n` +
-      `• <code>/send 0.5 MNT 0x456...def Payment for coffee</code>\n` +
-      `• <code>/send 100 USDT 0x789...ghi Monthly subscription</code>\n\n` +
-      `<b>Supported tokens:</b> MNT, USDC, USDT, DAI\n\n` +
-      `<i>Note: The address must be a valid Ethereum address</i>`,
+        `<b>Usage:</b> <code>/send &lt;amount&gt; &lt;token&gt; &lt;address&gt; [memo]</code>\n\n` +
+        `<b>Examples:</b>\n` +
+        `• <code>/send 10 USDC 0x123...abc</code>\n` +
+        `• <code>/send 0.5 MNT 0x456...def Payment for coffee</code>\n` +
+        `• <code>/send 100 USDT 0x789...ghi Monthly subscription</code>\n\n` +
+        `<b>Supported tokens:</b> MNT, USDC, USDT, DAI\n\n` +
+        `<i>Note: The address must be a valid Ethereum address</i>`,
       {
         reply_markup: {
           inline_keyboard: [
@@ -261,7 +396,7 @@ export class CallbackHandler {
   private async handlePaymentCallback(chatId: number, userId: string) {
     try {
       const wallet = await this.walletRepository.findOne({ userId });
-      if (!wallet?.address) {
+      if (!wallet) {
         await this.telegramBotService.sendMessage(
           chatId,
           '❌ No wallet found. Use /start to create a wallet.',
@@ -284,7 +419,7 @@ export class CallbackHandler {
     await this.telegramBotService.sendMessage(
       chatId,
       `📋 <b>Wallet Address</b>\n\n<code>${address}</code>\n\n` +
-      `<i>Tap to copy the address above</i>`,
+        `<i>Tap to copy the address above</i>`,
     );
   }
 
@@ -303,7 +438,7 @@ export class CallbackHandler {
       await this.telegramBotService.sendMessage(
         chatId,
         `📋 <b>Payment Link</b>\n\n<code>${paymentLink.linkUrl}</code>\n\n` +
-        `<i>Tap to copy the link above, or use the button below to open it.</i>`,
+          `<i>Tap to copy the link above, or use the button below to open it.</i>`,
         {
           reply_markup: {
             inline_keyboard: [
@@ -357,8 +492,8 @@ export class CallbackHandler {
       const detailsList =
         paymentLink.details && Object.keys(paymentLink.details).length > 0
           ? Object.keys(paymentLink.details)
-            .map((field, index) => `  ${index + 1}. ${field}`)
-            .join('\n')
+              .map((field, index) => `  ${index + 1}. ${field}`)
+              .join('\n')
           : '  No details to collect';
 
       // Format payment info
@@ -508,8 +643,8 @@ export class CallbackHandler {
       await this.telegramBotService.sendMessage(
         chatId,
         `⏳ <b>Processing Transfer...</b>\n\n` +
-        `💸 Sending ${amount} ${token} to <code>${toAddress}</code>\n\n` +
-        `⚠️ Please wait, this may take a few moments...`,
+          `💸 Sending ${amount} ${token} to <code>${toAddress}</code>\n\n` +
+          `⚠️ Please wait, this may take a few moments...`,
       );
 
       // Execute the transfer using Mastra service
@@ -539,8 +674,8 @@ export class CallbackHandler {
       await this.telegramBotService.sendMessage(
         chatId,
         `❌ <b>Transfer Failed</b>\n\n` +
-        `An error occurred while processing your transfer. Please try again later.\n\n` +
-        `Error: ${error.message}`,
+          `An error occurred while processing your transfer. Please try again later.\n\n` +
+          `Error: ${error.message}`,
         {
           reply_markup: {
             inline_keyboard: [

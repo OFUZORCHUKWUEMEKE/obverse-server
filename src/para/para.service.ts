@@ -3,6 +3,14 @@ import { Para as ParaServer, Environment } from '@getpara/server-sdk';
 import { ConfigService } from '@nestjs/config';
 import { ParaEthersSigner } from '@getpara/ethers-v6-integration';
 import { ethers, JsonRpcProvider } from 'ethers';
+// import { ParaSolanaWeb3Signer } from "@getpara/solana-web3.js-v1-integration@alpha";
+import {
+  Connection,
+  clusterApiUrl,
+  SystemProgram,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+} from '@solana/web3.js';
 import {
   createPublicClient,
   http,

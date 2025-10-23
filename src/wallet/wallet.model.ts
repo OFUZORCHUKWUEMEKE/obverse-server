@@ -16,6 +16,7 @@ export enum BlockchainNetwork {
   ARBITRUM = 'arbitrum',
   OPTIMISM = 'optimism',
   MANTLE = 'mantle',
+  SOLANA = 'solana',
 }
 
 @Schema({
@@ -26,14 +27,31 @@ export class Wallet {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
-  @Prop({ required: true, unique: true })
-  paraWalletId: string; // Para wallet identifier
+  // Legacy Para fields (optional for backward compatibility)
+  @Prop({ unique: true, sparse: true })
+  paraWalletId?: string; // Para wallet identifier
 
-  @Prop({ required: true, unique: true })
-  address: string; // Wallet address
+  @Prop({ unique: true, sparse: true })
+  address?: string; // Legacy wallet address (for EVM)
 
-  @Prop({ type: String, required: true })
-  walletShareData: string;
+  @Prop({ type: String })
+  walletShareData?: string; // Para keyshare
+
+  // Privy fields
+  @Prop({ unique: true, sparse: true })
+  privyId?: string; // Privy user ID
+
+  @Prop({ unique: true, sparse: true })
+  solanaAddress?: string; // Solana public key
+
+  @Prop({ unique: true, sparse: true })
+  arbitrumAddress?: string; // Arbitrum address
+
+  @Prop()
+  solanaWalletId?: string; // Privy Solana wallet ID
+
+  @Prop()
+  arbitrumWalletId?: string; // Privy Arbitrum wallet ID
 
   @Prop({ type: String, enum: WalletStatus, default: WalletStatus.ACTIVE })
   status: WalletStatus;
@@ -44,10 +62,10 @@ export class Wallet {
       enum: BlockchainNetwork,
     },
   ])
-  supportedNetworks: BlockchainNetwork[];
+  supportedNetworks?: BlockchainNetwork[];
 
-  @Prop({ default: BlockchainNetwork.ETHEREUM })
-  defaultNetwork: BlockchainNetwork;
+  @Prop({ type: String, enum: BlockchainNetwork })
+  defaultNetwork?: BlockchainNetwork;
 
   @Prop({ type: Object })
   balances?: {
@@ -84,6 +102,9 @@ export const WalletSchema = SchemaFactory.createForClass(Wallet);
 
 // Add indexes
 WalletSchema.index({ userId: 1 });
-WalletSchema.index({ address: 1 }, { unique: true });
-WalletSchema.index({ paraWalletId: 1 }, { unique: true });
+WalletSchema.index({ address: 1 }, { unique: true, sparse: true });
+WalletSchema.index({ paraWalletId: 1 }, { unique: true, sparse: true });
+WalletSchema.index({ privyId: 1 }, { unique: true, sparse: true });
+WalletSchema.index({ solanaAddress: 1 }, { unique: true, sparse: true });
+WalletSchema.index({ arbitrumAddress: 1 }, { unique: true, sparse: true });
 WalletSchema.index({ status: 1 });

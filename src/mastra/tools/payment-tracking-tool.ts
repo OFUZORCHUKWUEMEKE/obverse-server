@@ -106,12 +106,14 @@ export const createPaymentTrackingTool = (
             errorMessage = `No payment links found matching "${linkName}"`;
 
             // Get all user's payment links to provide suggestions
-            const allUserLinks = await paymentLinkRepository.find({ creatorUserId: user._id });
+            const allUserLinks = await paymentLinkRepository.find({
+              creatorUserId: user._id,
+            });
             if (allUserLinks && allUserLinks.length > 0) {
               suggestions = allUserLinks
                 .slice(0, 5)
-                .map(link => link.title)
-                .filter(title => title && title.trim());
+                .map((link) => link.title)
+                .filter((title) => title && title.trim());
             }
           } else {
             errorMessage = 'No payment links found for this user';
@@ -163,7 +165,7 @@ export const createPaymentTrackingTool = (
                 linkId: linkId || null,
                 linkName: linkName || null,
                 matchesFound: 0,
-              }
+              },
             },
           };
         }
@@ -179,9 +181,9 @@ export const createPaymentTrackingTool = (
           // Filter payments by timeframe
           const filteredPayments = paymentLink.payments
             ? paymentLink.payments.filter(
-              (payment) =>
-                !startDate || new Date(payment.paidAt) >= startDate,
-            )
+                (payment) =>
+                  !startDate || new Date(payment.paidAt) >= startDate,
+              )
             : [];
 
           // Calculate link-specific metrics
@@ -216,7 +218,8 @@ export const createPaymentTrackingTool = (
           }
 
           // Generate transaction tracking URL
-          const baseUrl = process.env.BASE_URL || 'https://obverse-ui.vercel.app';
+          const baseUrl =
+            process.env.BASE_URL || 'https://obverse-ui.vercel.app';
           const trackingUrl = `${baseUrl}/transactions/${paymentLink.linkId}`;
 
           // Link summary
@@ -254,8 +257,7 @@ export const createPaymentTrackingTool = (
 
         // Sort transactions by date (most recent first)
         allTransactions.sort(
-          (a, b) =>
-            new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime(),
+          (a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime(),
         );
 
         // Calculate overall metrics
@@ -266,7 +268,11 @@ export const createPaymentTrackingTool = (
           totalTransactions > 0 ? totalAmountReceived / totalTransactions : 0;
 
         // Performance insights
-        const insights = generatePaymentInsights(linkSummaries, timeframe, linkName);
+        const insights = generatePaymentInsights(
+          linkSummaries,
+          timeframe,
+          linkName,
+        );
 
         // Generate smart response message
         const responseMessage = generateSmartResponse(
@@ -276,7 +282,7 @@ export const createPaymentTrackingTool = (
           totalAmountReceived,
           linkName,
           linkId,
-          timeframe
+          timeframe,
         );
 
         return {
@@ -309,7 +315,8 @@ export const createPaymentTrackingTool = (
           },
         };
       } catch (error) {
-        const smartErrorMessage = `🚨 **Payment Tracking Error**\n\n` +
+        const smartErrorMessage =
+          `🚨 **Payment Tracking Error**\n\n` +
           `Something went wrong while tracking your payment links.\n\n` +
           `**Error Details:** ${error.message}\n\n` +
           `💡 **What you can try:**\n` +
@@ -366,7 +373,10 @@ function generatePaymentInsights(
     );
 
     const bestPerformer = linkSummaries.reduce((best, current) =>
-      parseFloat(current.metrics.totalAmountReceived) > parseFloat(best.metrics.totalAmountReceived) ? current : best
+      parseFloat(current.metrics.totalAmountReceived) >
+      parseFloat(best.metrics.totalAmountReceived)
+        ? current
+        : best,
     );
 
     if (parseFloat(bestPerformer.metrics.totalAmountReceived) > 0) {
@@ -379,7 +389,7 @@ function generatePaymentInsights(
   // Best performing link
   const bestLink = linkSummaries.reduce((best, current) =>
     parseFloat(current.metrics.totalAmountReceived) >
-      parseFloat(best.metrics.totalAmountReceived)
+    parseFloat(best.metrics.totalAmountReceived)
       ? current
       : best,
   );
@@ -405,14 +415,18 @@ function generatePaymentInsights(
     ) / linkSummaries.length;
 
   if (avgConversionRate > 0) {
-    insights.push(`📊 Your average conversion rate: ${avgConversionRate.toFixed(2)}%`);
+    insights.push(
+      `📊 Your average conversion rate: ${avgConversionRate.toFixed(2)}%`,
+    );
 
     const highPerformingLinks = linkSummaries.filter(
       (link) => parseFloat(link.metrics.conversionRate) > avgConversionRate,
     );
 
     const lowPerformingLinks = linkSummaries.filter(
-      (link) => parseFloat(link.metrics.conversionRate) < avgConversionRate && parseFloat(link.metrics.conversionRate) > 0,
+      (link) =>
+        parseFloat(link.metrics.conversionRate) < avgConversionRate &&
+        parseFloat(link.metrics.conversionRate) > 0,
     );
 
     if (highPerformingLinks.length > 0) {
@@ -445,7 +459,10 @@ function generatePaymentInsights(
   }
 
   if (inactiveLinks.length > 0) {
-    const totalInactiveViews = inactiveLinks.reduce((sum, link) => sum + link.metrics.viewCount, 0);
+    const totalInactiveViews = inactiveLinks.reduce(
+      (sum, link) => sum + link.metrics.viewCount,
+      0,
+    );
     if (totalInactiveViews > 0) {
       insights.push(
         `⚠️ ${inactiveLinks.length} link(s) have ${totalInactiveViews} views but no payments - potential conversion opportunities!`,
@@ -462,7 +479,7 @@ function generatePaymentInsights(
     (link) =>
       link.metrics.lastPaymentAt &&
       new Date(link.metrics.lastPaymentAt) >
-      new Date(Date.now() - 24 * 60 * 60 * 1000),
+        new Date(Date.now() - 24 * 60 * 60 * 1000),
   );
 
   if (recentLinks.length > 0) {
@@ -481,15 +498,16 @@ function generateSmartResponse(
   totalAmountReceived: number,
   linkName?: string,
   linkId?: string,
-  timeframe: string = '30d'
+  timeframe: string = '30d',
 ): string {
-  const timeframeText = {
-    '24h': 'last 24 hours',
-    '7d': 'last 7 days',
-    '30d': 'last 30 days',
-    '90d': 'last 90 days',
-    'all': 'all time'
-  }[timeframe] || timeframe;
+  const timeframeText =
+    {
+      '24h': 'last 24 hours',
+      '7d': 'last 7 days',
+      '30d': 'last 30 days',
+      '90d': 'last 90 days',
+      all: 'all time',
+    }[timeframe] || timeframe;
 
   let response = '';
 
@@ -518,7 +536,9 @@ function generateSmartResponse(
         response += `• Average Transaction: $${link.metrics.averageTransactionAmount}\n`;
 
         if (link.metrics.lastPaymentAt) {
-          const lastPayment = new Date(link.metrics.lastPaymentAt).toLocaleString();
+          const lastPayment = new Date(
+            link.metrics.lastPaymentAt,
+          ).toLocaleString();
           response += `• Last Payment: ${lastPayment}\n`;
         }
       } else {
@@ -536,7 +556,6 @@ function generateSmartResponse(
           response += `${idx + 1}. $${payment.amount} - ${payment.payerAddress.slice(0, 8)}... (${date})\n`;
         });
       }
-
     } else if (paymentLinks.length > 1) {
       response += `🔍 **Multiple Links Found**\n\n`;
       response += `Found **${paymentLinks.length}** payment links matching "${linkName}"\n\n`;
@@ -566,10 +585,17 @@ function generateSmartResponse(
     if (linkSummaries.length > 0) {
       // Show top performing links
       const topLinks = linkSummaries
-        .sort((a, b) => parseFloat(b.metrics.totalAmountReceived) - parseFloat(a.metrics.totalAmountReceived))
+        .sort(
+          (a, b) =>
+            parseFloat(b.metrics.totalAmountReceived) -
+            parseFloat(a.metrics.totalAmountReceived),
+        )
         .slice(0, 3);
 
-      if (topLinks.length > 0 && parseFloat(topLinks[0].metrics.totalAmountReceived) > 0) {
+      if (
+        topLinks.length > 0 &&
+        parseFloat(topLinks[0].metrics.totalAmountReceived) > 0
+      ) {
         response += `🏆 **Top Performing Links:**\n`;
         topLinks.forEach((link, idx) => {
           const tokenEmoji = getTokenEmoji(link.token);
@@ -582,8 +608,12 @@ function generateSmartResponse(
       }
 
       // Active vs inactive links
-      const activeLinks = linkSummaries.filter(link => link.metrics.totalTransactions > 0);
-      const inactiveLinks = linkSummaries.filter(link => link.metrics.totalTransactions === 0);
+      const activeLinks = linkSummaries.filter(
+        (link) => link.metrics.totalTransactions > 0,
+      );
+      const inactiveLinks = linkSummaries.filter(
+        (link) => link.metrics.totalTransactions === 0,
+      );
 
       if (activeLinks.length > 0) {
         response += `✅ **Active:** ${activeLinks.length} links with transactions\n`;
@@ -605,10 +635,10 @@ function generateSmartResponse(
 
 function getTokenEmoji(token: string): string {
   const emojis = {
-    'USDC': '🔵',
-    'USDT': '🟢',
-    'DAI': '🟡',
-    'MNT': '🟢'
+    USDC: '🔵',
+    USDT: '🟢',
+    DAI: '🟡',
+    MNT: '🟢',
   };
   return emojis[token] || '🪙';
 }

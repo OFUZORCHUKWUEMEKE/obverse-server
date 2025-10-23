@@ -187,12 +187,35 @@ export class McpService {
     try {
       // Find user's wallet
       const wallet = await this.walletRepository.findOne({ userId });
-      if (!wallet?.address) {
+      if (!wallet) {
         return {
           content: [
             {
               type: 'text',
               text: '❌ No wallet found for this user. User needs to create a wallet first using /start.',
+            },
+          ],
+        };
+      }
+
+      // Check if this is a Privy wallet (not yet supported)
+      if (wallet.solanaAddress && wallet.arbitrumAddress) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '⚠️ MCP balance tool is currently only available for legacy Mantle wallets. This feature will be available for multi-chain wallets soon!',
+            },
+          ],
+        };
+      }
+
+      if (!wallet.address) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '❌ Wallet address not found.',
             },
           ],
         };
@@ -253,7 +276,7 @@ export class McpService {
     try {
       // Check if user has a wallet
       const wallet = await this.walletRepository.findOne({ userId });
-      if (!wallet?.address) {
+      if (!wallet) {
         return {
           content: [
             {
@@ -664,7 +687,7 @@ export class McpService {
         this.userRepository.findOne({ telegramId: userId }),
       ]);
 
-      if (!wallet?.address) {
+      if (!wallet) {
         return {
           content: [
             {
@@ -681,6 +704,20 @@ export class McpService {
             {
               type: 'text',
               text: '❌ User not found. Please use /start to register.',
+            },
+          ],
+        };
+      }
+
+      // Determine the address to use (Arbitrum for Privy wallets, legacy address for Para wallets)
+      const walletAddress = wallet.arbitrumAddress || wallet.address;
+
+      if (!walletAddress) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '❌ No valid wallet address found.',
             },
           ],
         };

@@ -4,7 +4,7 @@ import TelegramBot from 'node-telegram-bot-api';
 import { UserRepository } from 'src/users/user-repository';
 import { WalletRepository } from 'src/wallet/wallet.repository';
 import { TelegramService } from '../telegram.service';
-import { ParaService } from 'src/para/para.service';
+import { PrivyService } from 'src/para/privy.service';
 import { PaymentLinkRepository } from 'src/payment-link/payment-repository';
 import {
   PaymentLinkType,
@@ -39,7 +39,7 @@ export class MessageHandler {
     private telegramService: TelegramService,
     private userRepository: UserRepository,
     private walletRepository: WalletRepository,
-    private paraService: ParaService,
+    private privyService: PrivyService,
     private paymentLinkRepository: PaymentLinkRepository,
     private mcpService: McpService,
     private mastraService: MastraService,
@@ -352,6 +352,7 @@ export class MessageHandler {
       const exWallet = await this.walletRepository.findOne({
         userId: telegramId,
       });
+      console.log(exWallet)
       if (!telegramId) {
         throw new Error('telegramId is undefined');
       }
@@ -377,7 +378,7 @@ export class MessageHandler {
         this.logger.log(
           `No existing wallet found for user ${telegramId}. Creating a new one...`,
         );
-        const wallet = await this.paraService.createWallet(telegramId);
+        const wallet = await this.privyService.createWallet(telegramId);
         if (!wallet) {
           this.logger.error(`Failed to create wallet for user ${telegramId}`);
           await this.telegramService.sendErrorMessage(
@@ -388,19 +389,22 @@ export class MessageHandler {
         }
         const newWallet = await this.walletRepository.create({
           userId: telegramId,
-          address: wallet.wallet.address,
-          paraWalletId: wallet.wallet.id,
-          walletShareData: wallet.keyShare,
+          privyId: wallet.privyId,
+          solanaAddress: wallet.solanaAddress,
+          arbitrumAddress: wallet.arbitrumAddress,
+          solanaWalletId: wallet.solanaWalletId,
+          arbitrumWalletId: wallet.arbitrumWalletId,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
         this.logger.log(
-          `New wallet created for user ${telegramId}: ${newWallet.address}`,
+          `New Privy wallet created for user ${telegramId}. Solana: ${newWallet.solanaAddress}, Arbitrum: ${newWallet.arbitrumAddress}`,
         );
         const welcomeText =
-          `🎉 <b>Welcome back!</b>\n\n` +
-          `Your wallet is ready to use.\n\n` +
-          `<b>Wallet Address:</b>\n<code>${newWallet.address}</code>\n\n` +
+          `🎉 <b>Welcome!</b>\n\n` +
+          `Your multi-chain wallet is ready to use.\n\n` +
+          `<b>🟣 Solana Address:</b>\n<code>${newWallet.solanaAddress}</code>\n\n` +
+          `<b>🔷 Arbitrum Address:</b>\n<code>${newWallet.arbitrumAddress}</code>\n\n` +
           `What would you like to do?\n\n` +
           `💰 /balance - Check your balance\n` +
           `📊 /transactions - View transaction history\n` +
@@ -424,8 +428,9 @@ export class MessageHandler {
       }
       const welcomeText =
         `🎉 <b>Welcome back!</b>\n\n` +
-        `Your wallet is ready to use.\n\n` +
-        `<b>Wallet Address:</b>\n<code>${exWallet?.address}</code>\n\n` +
+        `Your multi-chain wallet is ready to use.\n\n` +
+        `<b>🟣 Solana Address:</b>\n<code>${exWallet?.solanaAddress}</code>\n\n` +
+        `<b>🔷 Arbitrum Address:</b>\n<code>${exWallet?.arbitrumAddress}</code>\n\n` +
         `What would you like to do?\n\n` +
         `💰 /balance - Check your balance\n` +
         `📊 /transactions - View transaction history\n` +
@@ -495,9 +500,9 @@ export class MessageHandler {
 
       const walletText =
         `👛 <b>Your Wallet</b>\n\n` +
-        `<b>Address:</b>\n<code>${wallet.address}</code>\n\n` +
+        `<b>Address:</b>\n<code>${wallet.address || wallet.solanaAddress || 'N/A'}</code>\n\n` +
         `<b>Status:</b> ${wallet.status}\n` +
-        `<b>Networks:</b> ${wallet.supportedNetworks.join(', ')}\n` +
+        `<b>Networks:</b> ${wallet.supportedNetworks?.join(', ') || 'Multi-chain'}\n` +
         `<b>Created:</b> ${wallet.createdAt?.toLocaleDateString()}\n\n` +
         `<b>Quick Actions:</b>`;
 
@@ -548,7 +553,7 @@ export class MessageHandler {
       const wallet = await this.walletRepository.findOne({
         userId: telegramId,
       });
-      if (!wallet?.address) {
+      if (!wallet) {
         await this.telegramService.sendMessage(
           chatId,
           '❌ No wallet found. Use /start to create a wallet.',
@@ -561,50 +566,96 @@ export class MessageHandler {
         '⏳ Fetching your balances...',
       );
 
-      this.logger.log(`Starting balance fetch for wallet: ${wallet.address}`);
-      const [ethBalance, mantleBalance, tokenBalances] = await Promise.all([
-        this.paraService.getBalance(wallet.address),
-        this.paraService.getMantleBalance(wallet.address),
-        this.paraService.getAllTokenBalances(wallet.address),
-      ]);
-      this.logger.log(
-        `Balance fetch completed. ETH: ${ethBalance.balance}, Mantle: ${mantleBalance.formatted}, Tokens: ${tokenBalances.length} items`,
-      );
+      // Check if this is a Privy wallet or legacy Para wallet
+      if (wallet.solanaAddress && wallet.arbitrumAddress) {
+        // Privy wallet - fetch Solana and Arbitrum balances
+        this.logger.log(
+          `Starting balance fetch for Privy wallet: Solana ${wallet.solanaAddress}, Arbitrum ${wallet.arbitrumAddress}`,
+        );
+        const [solBalance, arbBalance, solanaTokens, arbTokens] =
+          await Promise.all([
+            this.privyService.getSolanaBalance(wallet.solanaAddress),
+            this.privyService.getArbitrumBalance(wallet.arbitrumAddress),
+            this.privyService.getAllSolanaTokenBalances(wallet.solanaAddress),
+            this.privyService.getAllArbitrumTokenBalances(
+              wallet.arbitrumAddress,
+            ),
+          ]);
 
-      let balanceText =
-        `💰 <b>Your Wallet Balance</b>\n\n` +
-        `<b>🔷 ETH:</b> ${ethBalance.balance || '0'} ETH\n` +
-        `<b>🟢 MNT:</b> ${mantleBalance.formatted || '0'} ${mantleBalance.symbol || 'MNT'}\n\n` +
-        `<b>🪙 Token Balances:</b>\n`;
+        this.logger.log(
+          `Balance fetch completed. SOL: ${solBalance.balance}, ETH: ${arbBalance.balance}`,
+        );
 
-      // Add token balances
-      for (const token of tokenBalances) {
-        const emoji =
-          token.symbol === 'USDC'
-            ? '🔵'
-            : token.symbol === 'USDT'
-              ? '🟢'
-              : '🟡';
-        const balance = parseFloat(token.balance).toFixed(6);
-        balanceText += `${emoji} <b>${token.symbol}:</b> ${balance}\n`;
+        let balanceText =
+          `💰 <b>Your Multi-Chain Wallet Balance</b>\n\n` +
+          `<b>🟣 Solana Network:</b>\n` +
+          `<b>SOL:</b> ${solBalance.balance || '0'} SOL\n`;
+
+        // Add Solana token balances
+        for (const token of solanaTokens) {
+          const emoji =
+            token.symbol === 'USDC'
+              ? '🔵'
+              : token.symbol === 'USDT'
+                ? '🟢'
+                : '🟡';
+          const balance = parseFloat(token.balance).toFixed(6);
+          balanceText += `${emoji} <b>${token.symbol}:</b> ${balance}\n`;
+        }
+
+        balanceText +=
+          `\n<b>🔷 Arbitrum Network:</b>\n` +
+          `<b>ETH:</b> ${arbBalance.balance || '0'} ETH\n`;
+
+        // Add Arbitrum token balances
+        for (const token of arbTokens) {
+          const emoji =
+            token.symbol === 'USDC'
+              ? '🔵'
+              : token.symbol === 'USDT'
+                ? '🟢'
+                : '🟡';
+          const balance = parseFloat(token.balance).toFixed(6);
+          balanceText += `${emoji} <b>${token.symbol}:</b> ${balance}\n`;
+        }
+
+        balanceText +=
+          `\n<b>📍 Wallet Addresses:</b>\n` +
+          `<b>Solana:</b> <code>${wallet.solanaAddress}</code>\n` +
+          `<b>Arbitrum:</b> <code>${wallet.arbitrumAddress}</code>`;
+
+        await this.telegramService.sendMessage(chatId, balanceText, {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '🔄 Refresh', callback_data: 'balance' },
+                { text: '💸 Send', callback_data: 'send' },
+              ],
+              [
+                { text: '📊 Transactions', callback_data: 'transactions' },
+                { text: '🔗 Payment Link', callback_data: 'payment' },
+              ],
+            ],
+          },
+        });
+        return;
       }
 
-      balanceText += `\n<b>📍 Wallet Address:</b>\n<code>${wallet.address}</code>`;
-
-      await this.telegramService.sendMessage(chatId, balanceText, {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '🔄 Refresh', callback_data: 'balance' },
-              { text: '💸 Send', callback_data: 'send' },
+      // Legacy Para wallet - not supported anymore
+      await this.telegramService.sendMessage(
+        chatId,
+        '⚠️ Legacy Para wallets are no longer supported.\n\nPlease create a new multi-chain wallet by using /start again.',
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '🔄 Create New Wallet', callback_data: 'start' },
+              ],
             ],
-            [
-              { text: '📊 Transactions', callback_data: 'transactions' },
-              { text: '🔗 Payment Link', callback_data: 'payment' },
-            ],
-          ],
+          },
         },
-      });
+      );
+      return;
     } catch (error) {
       this.logger.error('Error in balance command:', error);
       await this.telegramService.sendErrorMessage(
@@ -620,7 +671,7 @@ export class MessageHandler {
       const wallet = await this.walletRepository.findOne({
         userId: telegramId,
       });
-      if (!wallet?.address) {
+      if (!wallet) {
         await this.telegramService.sendMessage(
           chatId,
           '❌ No wallet found. Use /start to create a wallet.',
@@ -628,59 +679,79 @@ export class MessageHandler {
         return;
       }
 
+      // Check if this is a Privy wallet
+      if (wallet.solanaAddress && wallet.arbitrumAddress) {
+        await this.telegramService.sendMessage(
+          chatId,
+          '⏳ Loading your transactions...',
+        );
+
+        const [solanaTransactions] = await Promise.all([
+          this.privyService.getSolanaTransactions(wallet.solanaAddress, 5),
+        ]);
+
+        let transactionText = `📊 <b>Recent Transactions</b>\n\n`;
+
+        // Show Solana transactions
+        if (solanaTransactions.length > 0) {
+          transactionText += `<b>🟣 Solana Transactions:</b>\n\n`;
+          solanaTransactions.forEach((tx, index) => {
+            const statusEmoji = tx.status === 'success' ? '✅' : '❌';
+            const date = tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleDateString() : 'N/A';
+            transactionText += `${index + 1}. ${statusEmoji} ${date}\n`;
+            transactionText += `   Signature: <code>${tx.signature.substring(0, 16)}...</code>\n`;
+            transactionText += `   Fee: ${tx.fee} SOL\n\n`;
+          });
+        }
+
+        if (solanaTransactions.length === 0) {
+          transactionText += `No recent transactions found.\n\n`;
+        }
+
+        transactionText += `<b>📍 Wallet Addresses:</b>\n`;
+        transactionText += `<b>Solana:</b> <code>${wallet.solanaAddress}</code>\n`;
+        transactionText += `<b>Arbitrum:</b> <code>${wallet.arbitrumAddress}</code>`;
+
+        await this.telegramService.sendMessage(chatId, transactionText, {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '🔄 Refresh', callback_data: 'transactions' },
+                { text: '💰 Balance', callback_data: 'balance' },
+              ],
+              [
+                {
+                  text: '🟣 Solana Explorer',
+                  url: `https://explorer.solana.com/address/${wallet.solanaAddress}?cluster=devnet`,
+                },
+              ],
+              [
+                {
+                  text: '🔷 Arbitrum Explorer',
+                  url: `https://sepolia.arbiscan.io/address/${wallet.arbitrumAddress}`,
+                },
+              ],
+            ],
+          },
+        });
+        return;
+      }
+
+      // Legacy Para wallet - not supported
       await this.telegramService.sendMessage(
         chatId,
-        '⏳ Loading your transactions...',
-      );
-
-      const transactions = await this.paraService.getWalletTransactions(
-        wallet.address,
-        5,
-      );
-
-      let transactionText = `📊 <b>Recent Transactions</b>\n\n`;
-
-      // Show native transactions first
-      if (transactions.nativeTransactions.length > 0) {
-        transactionText += `<b>🔷 Native Transactions (MNT/ETH):</b>\n\n`;
-        transactions.nativeTransactions.forEach((tx, index) => {
-          transactionText += `${index + 1}. ${this.paraService.formatTransactionForDisplay(tx)}\n\n`;
-        });
-      }
-
-      // Show token transfers
-      if (transactions.tokenTransfers.length > 0) {
-        transactionText += `<b>🪙 Token Transfers:</b>\n\n`;
-        transactions.tokenTransfers.forEach((transfer, index) => {
-          transactionText += `${index + 1}. ${this.paraService.formatTokenTransferForDisplay(transfer)}\n\n`;
-        });
-      }
-
-      if (
-        transactions.nativeTransactions.length === 0 &&
-        transactions.tokenTransfers.length === 0
-      ) {
-        transactionText += `No recent transactions found for your wallet.\n\n`;
-      }
-
-      transactionText += `<b>📍 Wallet Address:</b>\n<code>${wallet.address}</code>`;
-
-      await this.telegramService.sendMessage(chatId, transactionText, {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '🔄 Refresh', callback_data: 'transactions' },
-              { text: '💰 Balance', callback_data: 'balance' },
+        '⚠️ Legacy Para wallets are no longer supported.\n\nPlease create a new multi-chain wallet by using /start again.',
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '🔄 Create New Wallet', callback_data: 'start' },
+              ],
             ],
-            [
-              {
-                text: '🌐 View on Explorer',
-                url: `https://explorer.mantle.xyz/address/${wallet.address}`,
-              },
-            ],
-          ],
+          },
         },
-      });
+      );
+      return;
     } catch (error) {
       this.logger.error('Error in transactions command:', error);
       await this.telegramService.sendErrorMessage(
@@ -698,10 +769,37 @@ export class MessageHandler {
     try {
       // Check if user has a wallet
       const wallet = await this.walletRepository.findOne({ userId });
-      if (!wallet?.address) {
+      if (!wallet) {
         await this.telegramService.sendMessage(
           chatId,
           '❌ No wallet found. Use /start to create a wallet first.',
+        );
+        return;
+      }
+
+      // Check if this is a Privy wallet (not yet supported for send)
+      if (wallet.solanaAddress && wallet.arbitrumAddress) {
+        await this.telegramService.sendMessage(
+          chatId,
+          '⚠️ Sending tokens is currently only available for legacy Mantle wallets.\n\nThis feature will be available for multi-chain wallets soon!',
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '💰 Balance', callback_data: 'balance' },
+                  { text: '🔗 Payment Link', callback_data: 'payment' },
+                ],
+              ],
+            },
+          },
+        );
+        return;
+      }
+
+      if (!wallet.address) {
+        await this.telegramService.sendMessage(
+          chatId,
+          '❌ Wallet address not found.',
         );
         return;
       }
@@ -806,7 +904,7 @@ export class MessageHandler {
   ) {
     try {
       const wallet = await this.walletRepository.findOne({ userId });
-      if (!wallet?.address) {
+      if (!wallet) {
         await this.telegramService.sendMessage(
           chatId,
           '❌ No wallet found. Use /start to create a wallet.',
@@ -1193,6 +1291,13 @@ export class MessageHandler {
         throw new Error('Wallet or user not found');
       }
 
+      // Determine the address to use (Arbitrum for Privy wallets, legacy address for Para wallets)
+      const walletAddress = wallet.arbitrumAddress || wallet.address;
+
+      if (!walletAddress) {
+        throw new Error('No valid wallet address found');
+      }
+
       // Generate unique link ID
       const linkId = this.generateLinkId();
       const linkUrl = `https://obverse-ui.vercel.app/pay/${linkId}`;
@@ -1205,7 +1310,7 @@ export class MessageHandler {
       };
 
       const paymentLink = await this.paymentLinkRepository.create({
-        address: wallet.address,
+        address: walletAddress,
         creatorUserId: user._id,
         creatorWalletId: wallet._id,
         linkId,

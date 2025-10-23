@@ -31,7 +31,8 @@ export const createBalanceTool = (walletService: any, paraService: any) => {
               data: null,
             };
           }
-          address = wallet.address;
+          // Use arbitrumAddress for Privy wallets, address for legacy wallets
+          address = wallet.arbitrumAddress || wallet.address;
         }
 
         if (!address) {

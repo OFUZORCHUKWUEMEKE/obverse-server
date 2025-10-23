@@ -226,10 +226,25 @@ async function validateTransferInputs(
 
   // Check if user has a wallet
   const wallet = await walletRepository.findOne({ userId: telegramUserId });
-  if (!wallet?.address) {
+  if (!wallet) {
     return {
       isValid: false,
       error: 'No wallet found. Please use /start to create a wallet first.',
+    };
+  }
+
+  // Check if this is a Privy wallet (not yet supported for transfers)
+  if (wallet.solanaAddress && wallet.arbitrumAddress) {
+    return {
+      isValid: false,
+      error: 'Sending tokens is currently only available for legacy Mantle wallets. This feature will be available for multi-chain wallets soon!',
+    };
+  }
+
+  if (!wallet.address) {
+    return {
+      isValid: false,
+      error: 'Wallet address not found.',
     };
   }
 

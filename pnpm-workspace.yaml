@@ -1,6 +1,9 @@
 ignoredBuiltDependencies:
   - '@nestjs/core'
   - '@scarf/scarf'
+  - bigint-buffer
+  - bufferutil
   - canvas
   - protobufjs
   - unrs-resolver
+  - utf-8-validate
