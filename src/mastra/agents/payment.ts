@@ -27,7 +27,8 @@ export class TelegramCryptoAgent {
    * and the Anthropic AI model.
    *
    * @param walletService Wallet service to interact with wallet data
-   * @param paraService Para service to interact with Para data
+   * @param privyService Privy service to interact with Solana wallets
+   * @param paraService Para service to interact with legacy Para wallets
    * @param paymentLinkRepository Payment link repository to interact with payment link data
    * @param walletRepository Wallet repository to interact with wallet data
    * @param userRepository User repository to interact with user data
@@ -35,6 +36,7 @@ export class TelegramCryptoAgent {
    */
   constructor(
     walletService: any,
+    privyService: any,
     paraService: any,
     paymentLinkRepository: any,
     walletRepository: any,
@@ -46,7 +48,7 @@ export class TelegramCryptoAgent {
     this.userRepository = userRepository;
 
     // Create tools
-    this.balanceTool = createBalanceTool(walletService, paraService);
+    this.balanceTool = createBalanceTool(walletService, privyService);
     this.paymentLinkTool = createPaymentLinkTool(
       paymentLinkRepository,
       walletRepository,

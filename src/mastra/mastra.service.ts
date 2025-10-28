@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { TelegramCryptoAgent } from './agents/payment';
 import { WalletService } from '../wallet/wallet.service';
 import { ParaService } from '../para/para.service';
+import { PrivyService } from '../para/privy.service';
 import { PaymentLinkRepository } from '../payment-link/payment-repository';
 import { WalletRepository } from '../wallet/wallet.repository';
 import { UserRepository } from '../users/user-repository';
@@ -15,6 +16,7 @@ export class MastraService {
   constructor(
     private walletService: WalletService,
     private paraService: ParaService,
+    private privyService: PrivyService,
     private paymentLinkRepository: PaymentLinkRepository,
     private walletRepository: WalletRepository,
     private userRepository: UserRepository,
@@ -27,6 +29,7 @@ export class MastraService {
     try {
       this.telegramAgent = new TelegramCryptoAgent(
         { walletRepository: this.walletRepository },
+        this.privyService,
         this.paraService,
         this.paymentLinkRepository,
         this.walletRepository,

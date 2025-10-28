@@ -391,20 +391,39 @@ export class MessageHandler {
           userId: telegramId,
           privyId: wallet.privyId,
           solanaAddress: wallet.solanaAddress,
-          arbitrumAddress: wallet.arbitrumAddress,
           solanaWalletId: wallet.solanaWalletId,
-          arbitrumWalletId: wallet.arbitrumWalletId,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
         this.logger.log(
-          `New Privy wallet created for user ${telegramId}. Solana: ${newWallet.solanaAddress}, Arbitrum: ${newWallet.arbitrumAddress}`,
+          `New Privy wallet created for user ${telegramId}. Solana: ${newWallet.solanaAddress}`,
         );
+
+        // Create associated token accounts for the wallet
+        this.logger.log(`Creating token accounts for user ${telegramId}...`);
+        try {
+          const tokenAccountResult =
+            await this.privyService.createTokenAccountsForWallet(telegramId);
+          this.logger.log(
+            `Token accounts created: ${tokenAccountResult.created.join(', ')}`,
+          );
+          if (tokenAccountResult.existing.length > 0) {
+            this.logger.log(
+              `Token accounts already existed: ${tokenAccountResult.existing.join(', ')}`,
+            );
+          }
+        } catch (error) {
+          this.logger.error(
+            `Failed to create token accounts for user ${telegramId}:`,
+            error,
+          );
+          // Continue anyway - token accounts can be created later if needed
+        }
+
         const welcomeText =
           `🎉 <b>Welcome!</b>\n\n` +
-          `Your multi-chain wallet is ready to use.\n\n` +
+          `Your Solana wallet is ready to use.\n\n` +
           `<b>🟣 Solana Address:</b>\n<code>${newWallet.solanaAddress}</code>\n\n` +
-          `<b>🔷 Arbitrum Address:</b>\n<code>${newWallet.arbitrumAddress}</code>\n\n` +
           `What would you like to do?\n\n` +
           `💰 /balance - Check your balance\n` +
           `📊 /transactions - View transaction history\n` +
@@ -428,9 +447,8 @@ export class MessageHandler {
       }
       const welcomeText =
         `🎉 <b>Welcome back!</b>\n\n` +
-        `Your multi-chain wallet is ready to use.\n\n` +
+        `Your Solana wallet is ready to use.\n\n` +
         `<b>🟣 Solana Address:</b>\n<code>${exWallet?.solanaAddress}</code>\n\n` +
-        `<b>🔷 Arbitrum Address:</b>\n<code>${exWallet?.arbitrumAddress}</code>\n\n` +
         `What would you like to do?\n\n` +
         `💰 /balance - Check your balance\n` +
         `📊 /transactions - View transaction history\n` +
@@ -567,27 +585,23 @@ export class MessageHandler {
       );
 
       // Check if this is a Privy wallet or legacy Para wallet
-      if (wallet.solanaAddress && wallet.arbitrumAddress) {
-        // Privy wallet - fetch Solana and Arbitrum balances
+      if (wallet.solanaAddress) {
+        // Privy wallet - fetch Solana balances
         this.logger.log(
-          `Starting balance fetch for Privy wallet: Solana ${wallet.solanaAddress}, Arbitrum ${wallet.arbitrumAddress}`,
+          `Starting balance fetch for Privy wallet: Solana ${wallet.solanaAddress}`,
         );
-        const [solBalance, arbBalance, solanaTokens, arbTokens] =
+        const [solBalance, solanaTokens] =
           await Promise.all([
             this.privyService.getSolanaBalance(wallet.solanaAddress),
-            this.privyService.getArbitrumBalance(wallet.arbitrumAddress),
             this.privyService.getAllSolanaTokenBalances(wallet.solanaAddress),
-            this.privyService.getAllArbitrumTokenBalances(
-              wallet.arbitrumAddress,
-            ),
           ]);
 
         this.logger.log(
-          `Balance fetch completed. SOL: ${solBalance.balance}, ETH: ${arbBalance.balance}`,
+          `Balance fetch completed. SOL: ${solBalance.balance}`,
         );
 
         let balanceText =
-          `💰 <b>Your Multi-Chain Wallet Balance</b>\n\n` +
+          `💰 <b>Your Wallet Balance</b>\n\n` +
           `<b>🟣 Solana Network:</b>\n` +
           `<b>SOL:</b> ${solBalance.balance || '0'} SOL\n`;
 
@@ -604,25 +618,8 @@ export class MessageHandler {
         }
 
         balanceText +=
-          `\n<b>🔷 Arbitrum Network:</b>\n` +
-          `<b>ETH:</b> ${arbBalance.balance || '0'} ETH\n`;
-
-        // Add Arbitrum token balances
-        for (const token of arbTokens) {
-          const emoji =
-            token.symbol === 'USDC'
-              ? '🔵'
-              : token.symbol === 'USDT'
-                ? '🟢'
-                : '🟡';
-          const balance = parseFloat(token.balance).toFixed(6);
-          balanceText += `${emoji} <b>${token.symbol}:</b> ${balance}\n`;
-        }
-
-        balanceText +=
-          `\n<b>📍 Wallet Addresses:</b>\n` +
-          `<b>Solana:</b> <code>${wallet.solanaAddress}</code>\n` +
-          `<b>Arbitrum:</b> <code>${wallet.arbitrumAddress}</code>`;
+          `\n<b>📍 Wallet Address:</b>\n` +
+          `<b>Solana:</b> <code>${wallet.solanaAddress}</code>`;
 
         await this.telegramService.sendMessage(chatId, balanceText, {
           reply_markup: {
@@ -644,7 +641,7 @@ export class MessageHandler {
       // Legacy Para wallet - not supported anymore
       await this.telegramService.sendMessage(
         chatId,
-        '⚠️ Legacy Para wallets are no longer supported.\n\nPlease create a new multi-chain wallet by using /start again.',
+        '⚠️ Legacy Para wallets are no longer supported.\n\nPlease create a new Solana wallet by using /start again.',
         {
           reply_markup: {
             inline_keyboard: [
@@ -680,7 +677,7 @@ export class MessageHandler {
       }
 
       // Check if this is a Privy wallet
-      if (wallet.solanaAddress && wallet.arbitrumAddress) {
+      if (wallet.solanaAddress) {
         await this.telegramService.sendMessage(
           chatId,
           '⏳ Loading your transactions...',
@@ -708,9 +705,8 @@ export class MessageHandler {
           transactionText += `No recent transactions found.\n\n`;
         }
 
-        transactionText += `<b>📍 Wallet Addresses:</b>\n`;
-        transactionText += `<b>Solana:</b> <code>${wallet.solanaAddress}</code>\n`;
-        transactionText += `<b>Arbitrum:</b> <code>${wallet.arbitrumAddress}</code>`;
+        transactionText += `<b>📍 Wallet Address:</b>\n`;
+        transactionText += `<b>Solana:</b> <code>${wallet.solanaAddress}</code>`;
 
         await this.telegramService.sendMessage(chatId, transactionText, {
           reply_markup: {
@@ -725,12 +721,6 @@ export class MessageHandler {
                   url: `https://explorer.solana.com/address/${wallet.solanaAddress}?cluster=devnet`,
                 },
               ],
-              [
-                {
-                  text: '🔷 Arbitrum Explorer',
-                  url: `https://sepolia.arbiscan.io/address/${wallet.arbitrumAddress}`,
-                },
-              ],
             ],
           },
         });
@@ -740,7 +730,7 @@ export class MessageHandler {
       // Legacy Para wallet - not supported
       await this.telegramService.sendMessage(
         chatId,
-        '⚠️ Legacy Para wallets are no longer supported.\n\nPlease create a new multi-chain wallet by using /start again.',
+        '⚠️ Legacy Para wallets are no longer supported.\n\nPlease create a new Solana wallet by using /start again.',
         {
           reply_markup: {
             inline_keyboard: [
@@ -778,10 +768,10 @@ export class MessageHandler {
       }
 
       // Check if this is a Privy wallet (not yet supported for send)
-      if (wallet.solanaAddress && wallet.arbitrumAddress) {
+      if (wallet.solanaAddress) {
         await this.telegramService.sendMessage(
           chatId,
-          '⚠️ Sending tokens is currently only available for legacy Mantle wallets.\n\nThis feature will be available for multi-chain wallets soon!',
+          '⚠️ Sending tokens is currently only available for legacy Mantle wallets.\n\nThis feature will be available for Solana wallets soon!',
           {
             reply_markup: {
               inline_keyboard: [
@@ -1291,8 +1281,8 @@ export class MessageHandler {
         throw new Error('Wallet or user not found');
       }
 
-      // Determine the address to use (Arbitrum for Privy wallets, legacy address for Para wallets)
-      const walletAddress = wallet.arbitrumAddress || wallet.address;
+      // Determine the address to use (Solana for Privy wallets, legacy address for Para wallets)
+      const walletAddress = wallet.solanaAddress || wallet.address;
 
       if (!walletAddress) {
         throw new Error('No valid wallet address found');

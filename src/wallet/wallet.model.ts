@@ -13,7 +13,6 @@ export enum BlockchainNetwork {
   ETHEREUM = 'ethereum',
   POLYGON = 'polygon',
   BSC = 'bsc',
-  ARBITRUM = 'arbitrum',
   OPTIMISM = 'optimism',
   MANTLE = 'mantle',
   SOLANA = 'solana',
@@ -44,14 +43,8 @@ export class Wallet {
   @Prop({ unique: true, sparse: true })
   solanaAddress?: string; // Solana public key
 
-  @Prop({ unique: true, sparse: true })
-  arbitrumAddress?: string; // Arbitrum address
-
   @Prop()
   solanaWalletId?: string; // Privy Solana wallet ID
-
-  @Prop()
-  arbitrumWalletId?: string; // Privy Arbitrum wallet ID
 
   @Prop({ type: String, enum: WalletStatus, default: WalletStatus.ACTIVE })
   status: WalletStatus;
@@ -106,5 +99,4 @@ WalletSchema.index({ address: 1 }, { unique: true, sparse: true });
 WalletSchema.index({ paraWalletId: 1 }, { unique: true, sparse: true });
 WalletSchema.index({ privyId: 1 }, { unique: true, sparse: true });
 WalletSchema.index({ solanaAddress: 1 }, { unique: true, sparse: true });
-WalletSchema.index({ arbitrumAddress: 1 }, { unique: true, sparse: true });
 WalletSchema.index({ status: 1 });

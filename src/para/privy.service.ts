@@ -14,7 +14,6 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from '@solana/web3.js';
-import { ethers } from 'ethers';
 import {
   getAssociatedTokenAddress,
   createAssociatedTokenAccountInstruction,
@@ -23,7 +22,6 @@ import {
 
 export enum BlockchainNetwork {
   SOLANA = 'solana',
-  ARBITRUM = 'arbitrum',
 }
 
 export interface TransactionResult {
@@ -46,9 +44,7 @@ export interface TokenBalance {
 export interface PrivyWalletInfo {
   privyId: string;
   solanaAddress: string;
-  arbitrumAddress: string;
   solanaWalletId: string;
-  arbitrumWalletId: string;
 }
 
 @Injectable()
@@ -56,18 +52,11 @@ export class PrivyService {
   private readonly logger = new Logger(PrivyService.name);
   private readonly privyClient: PrivyClient;
   private readonly solanaConnection: Connection;
-  private readonly arbitrumProvider: ethers.JsonRpcProvider;
 
   // Token addresses for Solana Devnet
   private readonly SOLANA_TOKENS = {
     USDC: 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr', // Devnet USDC
     USDT: '9NGDi2tZtNmCCp8SVLKNuGjuWAVwNF3Vap5tT7sCCGCV', // Devnet USDT
-  };
-
-  // Token addresses for Arbitrum Sepolia
-  private readonly ARBITRUM_TOKENS = {
-    USDC: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
-    USDT: '0xfd064A18f3BF249cf1f87FC203E90D8f650f2d63',
   };
 
   constructor(private configService: ConfigService) {
@@ -82,12 +71,6 @@ export class PrivyService {
       this.configService.get<string>('SOLANA_RPC_URL') ||
       'https://api.devnet.solana.com';
     this.solanaConnection = new Connection(solanaRpcUrl, 'confirmed');
-
-    // Initialize Arbitrum provider
-    const arbitrumRpcUrl =
-      this.configService.get<string>('ARBITRUM_RPC_URL') ||
-      'https://sepolia-rollup.arbitrum.io/rpc';
-    this.arbitrumProvider = new ethers.JsonRpcProvider(arbitrumRpcUrl);
 
     this.logger.log('Privy Service initialized successfully');
   }
@@ -105,7 +88,7 @@ export class PrivyService {
 
   /**
    * Create wallets for a user using Privy
-   * Creates both Solana and Arbitrum wallets linked to Telegram user ID
+   * Creates Solana wallet linked to Telegram user ID
    */
   async createWallet(telegramId: string): Promise<PrivyWalletInfo> {
     try {
@@ -128,7 +111,7 @@ export class PrivyService {
         );
       }
 
-      // Create new Privy user with both Solana and Arbitrum wallets
+      // Create new Privy user with Solana wallet
       privyUser = await this.privyClient.users().create({
         linked_accounts: [
           {
@@ -136,7 +119,7 @@ export class PrivyService {
             telegram_user_id: telegramId,
           },
         ],
-        wallets: [{ chain_type: 'solana' }, { chain_type: 'ethereum' }],
+        wallets: [{ chain_type: 'solana' }],
       });
 
       this.logger.log(`Privy user created successfully: ${privyUser.id}`);
@@ -180,21 +163,112 @@ export class PrivyService {
     const solanaWallet = walletAccounts.find(
       (account) => account.chain_type === 'solana',
     );
-    const ethWallet = walletAccounts.find(
-      (account) => account.chain_type === 'ethereum',
-    );
 
-    if (!solanaWallet || !ethWallet) {
-      throw new Error('Missing wallet accounts in Privy user');
+    if (!solanaWallet) {
+      throw new Error('Missing Solana wallet account in Privy user');
     }
 
     return {
       privyId: privyUser.id,
       solanaAddress: solanaWallet.address,
-      arbitrumAddress: ethWallet.address,
       solanaWalletId: solanaWallet.id,
-      arbitrumWalletId: ethWallet.id,
     };
+  }
+
+  // ============================================
+  // TOKEN ACCOUNT MANAGEMENT
+  // ============================================
+
+  /**
+   * Create associated token accounts for a wallet address
+   * This ensures the wallet can receive SPL tokens
+   */
+  async createTokenAccountsForWallet(
+    telegramId: string,
+  ): Promise<{ created: string[]; existing: string[] }> {
+    try {
+      this.logger.log(
+        `Creating token accounts for Telegram user: ${telegramId}`,
+      );
+
+      const walletInfo = await this.getWallet(telegramId);
+      const walletPublicKey = new PublicKey(walletInfo.solanaAddress);
+
+      const created: string[] = [];
+      const existing: string[] = [];
+
+      for (const [symbol, mintAddress] of Object.entries(this.SOLANA_TOKENS)) {
+        try {
+          const mintPublicKey = new PublicKey(mintAddress);
+          const tokenAccount = await getAssociatedTokenAddress(
+            mintPublicKey,
+            walletPublicKey,
+          );
+
+          // Check if account already exists
+          const accountInfo =
+            await this.solanaConnection.getAccountInfo(tokenAccount);
+
+          if (accountInfo) {
+            this.logger.log(
+              `Token account already exists for ${symbol}: ${tokenAccount.toString()}`,
+            );
+            existing.push(symbol);
+            continue;
+          }
+
+          // Create the associated token account
+          const instruction = createAssociatedTokenAccountInstruction(
+            walletPublicKey, // payer
+            tokenAccount, // associated token account
+            walletPublicKey, // owner
+            mintPublicKey, // mint
+          );
+
+          const { blockhash: recentBlockhash } =
+            await this.solanaConnection.getLatestBlockhash();
+
+          const message = new TransactionMessage({
+            payerKey: walletPublicKey,
+            instructions: [instruction],
+            recentBlockhash,
+          }).compileToV0Message();
+
+          const transaction = new VersionedTransaction(message);
+
+          const { hash } = await this.privyClient
+            .wallets()
+            .solana()
+            .signAndSendTransaction(walletInfo.solanaWalletId, {
+              caip2: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1',
+              transaction: Buffer.from(transaction.serialize()).toString(
+                'base64',
+              ),
+            });
+
+          await this.solanaConnection.confirmTransaction(hash);
+
+          this.logger.log(
+            `Created token account for ${symbol}: ${tokenAccount.toString()}, tx: ${hash}`,
+          );
+          created.push(symbol);
+        } catch (error) {
+          this.logger.error(
+            `Failed to create token account for ${symbol}: ${error.message}`,
+          );
+        }
+      }
+
+      return { created, existing };
+    } catch (error) {
+      this.logger.error(
+        `Failed to create token accounts for ${telegramId}:`,
+        error,
+      );
+      throw new BadRequestException(
+        `Failed to create token accounts: ${error.message}`,
+      );
+    }
   }
 
   // ============================================
@@ -220,29 +294,6 @@ export class PrivyService {
     }
   }
 
-  /**
-   * Get Arbitrum native balance (ETH)
-   */
-  async getArbitrumBalance(
-    address: string,
-  ): Promise<{ balance: string; formatted: string; symbol: string }> {
-    try {
-      this.logger.log(`Fetching ETH balance for address: ${address}`);
-      const balance = await this.arbitrumProvider.getBalance(address);
-      const formattedBalance = ethers.formatEther(balance);
-      this.logger.log(`ETH Balance: ${formattedBalance}`);
-      return {
-        balance: formattedBalance,
-        formatted: formattedBalance,
-        symbol: 'ETH',
-      };
-    } catch (error) {
-      this.logger.error(`Failed to get ETH balance for ${address}:`, error);
-      throw new BadRequestException(
-        `Failed to fetch ETH balance: ${error.message}`,
-      );
-    }
-  }
 
   /**
    * Get Solana SPL token balance
@@ -289,60 +340,6 @@ export class PrivyService {
     }
   }
 
-  /**
-   * Get Arbitrum ERC-20 token balance
-   */
-  async getArbitrumTokenBalance(
-    address: string,
-    tokenAddress: string,
-    decimals: number = 6,
-  ): Promise<TokenBalance> {
-    try {
-      const code = await this.arbitrumProvider.getCode(tokenAddress);
-      if (code === '0x') {
-        this.logger.debug(`Token contract not deployed at ${tokenAddress}`);
-        return {
-          symbol: 'UNKNOWN',
-          balance: '0',
-          decimals,
-          contractAddress: tokenAddress,
-        };
-      }
-
-      const tokenContract = new ethers.Contract(
-        tokenAddress,
-        ['function balanceOf(address) view returns (uint256)'],
-        this.arbitrumProvider,
-      );
-
-      const balance = await tokenContract.balanceOf(address);
-      const formattedBalance = ethers.formatUnits(balance, decimals);
-
-      const symbol =
-        Object.keys(this.ARBITRUM_TOKENS).find(
-          (key) =>
-            this.ARBITRUM_TOKENS[key as keyof typeof this.ARBITRUM_TOKENS] ===
-            tokenAddress,
-        ) || 'UNKNOWN';
-
-      return {
-        symbol,
-        balance: formattedBalance,
-        decimals,
-        contractAddress: tokenAddress,
-      };
-    } catch (error) {
-      this.logger.debug(
-        `Error fetching token balance for ${tokenAddress}: ${error.message}`,
-      );
-      return {
-        symbol: 'UNKNOWN',
-        balance: '0',
-        decimals,
-        contractAddress: tokenAddress,
-      };
-    }
-  }
 
   /**
    * Get all token balances for Solana
@@ -363,30 +360,6 @@ export class PrivyService {
     }
   }
 
-  /**
-   * Get all token balances for Arbitrum
-   */
-  async getAllArbitrumTokenBalances(address: string): Promise<TokenBalance[]> {
-    try {
-      this.logger.log(`Fetching all Arbitrum token balances for: ${address}`);
-      const tokenBalances = await Promise.all(
-        Object.entries(this.ARBITRUM_TOKENS).map(
-          async ([symbol, tokenAddress]) => {
-            const balance = await this.getArbitrumTokenBalance(
-              address,
-              tokenAddress,
-              6,
-            );
-            return { ...balance, symbol };
-          },
-        ),
-      );
-      return tokenBalances;
-    } catch (error) {
-      this.logger.error(`Error fetching Arbitrum token balances:`, error);
-      return [];
-    }
-  }
 
   /**
    * Fetch Privy user by platform user ID (compatibility method)
@@ -623,119 +596,7 @@ export class PrivyService {
     }
   }
 
-  /**
-   * Send Arbitrum native transaction (ETH)
-   */
-  async sendArbitrumTransaction(
-    telegramId: string,
-    toAddress: string,
-    amount: string,
-  ): Promise<TransactionResult> {
-    try {
-      this.logger.log(`Sending ${amount} ETH to ${toAddress}`);
 
-      const walletInfo = await this.getWallet(telegramId);
-
-      const { hash } = await this.privyClient
-        .wallets()
-        .ethereum()
-        .sendTransaction(walletInfo.arbitrumWalletId, {
-          caip2: 'eip155:421614',
-          params: {
-            transaction: {
-              to: toAddress,
-              value: '0x' + ethers.parseEther(amount).toString(16),
-              from: walletInfo.arbitrumAddress,
-            },
-          },
-        });
-
-      this.logger.log(`Transaction sent successfully: ${hash}`);
-
-      const receipt = await this.arbitrumProvider.waitForTransaction(hash);
-
-      if (!receipt) {
-        throw new Error('Transaction receipt not found');
-      }
-
-      return {
-        signature: receipt.hash,
-        status: receipt.status === 1 ? 'success' : 'failed',
-        amount,
-        fee: ethers.formatEther(
-          (receipt.gasUsed ?? BigInt(0)) * (receipt.gasPrice ?? BigInt(0)),
-        ),
-        timestamp: new Date(),
-      };
-    } catch (error) {
-      this.logger.error(`Arbitrum transaction failed:`, error);
-      throw new BadRequestException(`Failed to send ETH: ${error.message}`);
-    }
-  }
-
-  /**
-   * Send Arbitrum ERC-20 token transaction
-   */
-  async sendArbitrumTokenTransaction(
-    telegramId: string,
-    tokenAddress: string,
-    toAddress: string,
-    amount: string,
-    decimals: number,
-  ): Promise<TransactionResult> {
-    try {
-      this.logger.log(
-        `Sending ${amount} tokens (${tokenAddress}) to ${toAddress}`,
-      );
-
-      const walletInfo = await this.getWallet(telegramId);
-
-      const transferInterface = new ethers.Interface([
-        'function transfer(address to, uint256 amount) returns (bool)',
-      ]);
-
-      const transferData = transferInterface.encodeFunctionData('transfer', [
-        toAddress,
-        ethers.parseUnits(amount, decimals),
-      ]);
-
-      const { hash } = await this.privyClient
-        .wallets()
-        .ethereum()
-        .sendTransaction(walletInfo.arbitrumWalletId, {
-          caip2: 'eip155:421614',
-          params: {
-            transaction: {
-              to: tokenAddress,
-              data: transferData,
-              from: walletInfo.arbitrumAddress,
-            },
-          },
-        });
-
-      this.logger.log(`Token transaction sent successfully: ${hash}`);
-
-      const receipt = await this.arbitrumProvider.waitForTransaction(hash);
-
-      if (!receipt) {
-        throw new Error('Transaction receipt not found');
-      }
-
-      return {
-        signature: receipt.hash,
-        status: receipt.status === 1 ? 'success' : 'failed',
-        amount,
-        fee: ethers.formatEther(
-          (receipt.gasUsed ?? BigInt(0)) * (receipt.gasPrice ?? BigInt(0)),
-        ),
-        timestamp: new Date(),
-        tokenAddress,
-      };
-    } catch (error) {
-      this.logger.error(`Arbitrum token transaction failed:`, error);
-      throw new BadRequestException(`Failed to send token: ${error.message}`);
-    }
-  }
 
   // ============================================
   // TRANSACTION HISTORY
@@ -810,30 +671,4 @@ export class PrivyService {
     }
   }
 
-  /**
-   * Send Ethereum transaction using Privy (raw)
-   */
-  async sendEthereumTransaction(
-    walletId: string,
-    transaction: any,
-    caip2: string = 'eip155:421614',
-  ): Promise<{ hash: string }> {
-    try {
-      const result = await this.privyClient
-        .wallets()
-        .ethereum()
-        .sendTransaction(walletId, { caip2, params: { transaction } });
-
-      this.logger.log(`Successfully sent Ethereum transaction: ${result.hash}`);
-      return result;
-    } catch (error) {
-      this.logger.error(
-        `Error sending Ethereum transaction: ${error.message}`,
-        error.stack,
-      );
-      throw new BadRequestException(
-        `Failed to send Ethereum transaction: ${error.message}`,
-      );
-    }
-  }
 }

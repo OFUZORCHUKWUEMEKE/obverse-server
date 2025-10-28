@@ -77,6 +77,7 @@ export async function testEnhancedAgent() {
 
   const agent = new TelegramCryptoAgent(
     mockWalletService,
+    null, // privyService
     mockParaService,
     mockPaymentLinkRepository,
     mockWalletService.walletRepository,

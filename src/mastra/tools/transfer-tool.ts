@@ -234,10 +234,10 @@ async function validateTransferInputs(
   }
 
   // Check if this is a Privy wallet (not yet supported for transfers)
-  if (wallet.solanaAddress && wallet.arbitrumAddress) {
+  if (wallet.solanaAddress) {
     return {
       isValid: false,
-      error: 'Sending tokens is currently only available for legacy Mantle wallets. This feature will be available for multi-chain wallets soon!',
+      error: 'Sending tokens is currently only available for legacy Mantle wallets. This feature will be available for Solana wallets soon!',
     };
   }
 

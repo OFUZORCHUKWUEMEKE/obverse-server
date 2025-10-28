@@ -115,21 +115,19 @@ export class CallbackHandler {
       );
 
       // Check if this is a Privy wallet or legacy Para wallet
-      if (wallet.solanaAddress && wallet.arbitrumAddress) {
-        // Privy wallet - fetch Solana and Arbitrum balances
-        this.logger.log(`Fetching balances for Privy wallet: Solana ${wallet.solanaAddress}, Arbitrum ${wallet.arbitrumAddress}`);
+      if (wallet.solanaAddress) {
+        // Privy wallet - fetch Solana balances
+        this.logger.log(`Fetching balances for Privy wallet: Solana ${wallet.solanaAddress}`);
 
-        const [solBalance, arbBalance, solanaTokens, arbTokens] = await Promise.all([
+        const [solBalance, solanaTokens] = await Promise.all([
           this.privyService.getSolanaBalance(wallet.solanaAddress),
-          this.privyService.getArbitrumBalance(wallet.arbitrumAddress),
           this.privyService.getAllSolanaTokenBalances(wallet.solanaAddress),
-          this.privyService.getAllArbitrumTokenBalances(wallet.arbitrumAddress),
         ]);
 
-        this.logger.log(`Balance fetch completed. SOL: ${solBalance.balance}, ETH: ${arbBalance.balance}`);
+        this.logger.log(`Balance fetch completed. SOL: ${solBalance.balance}`);
 
         let balanceText =
-          `💰 <b>Your Multi-Chain Wallet Balance</b>\n\n` +
+          `💰 <b>Your Wallet Balance</b>\n\n` +
           `<b>🟣 Solana Network:</b>\n` +
           `<b>SOL:</b> ${solBalance.balance || '0'} SOL\n`;
 
@@ -140,19 +138,9 @@ export class CallbackHandler {
           balanceText += `${emoji} <b>${token.symbol}:</b> ${balance}\n`;
         }
 
-        balanceText += `\n<b>🔷 Arbitrum Network:</b>\n` + `<b>ETH:</b> ${arbBalance.balance || '0'} ETH\n`;
-
-        // Add Arbitrum token balances
-        for (const token of arbTokens) {
-          const emoji = token.symbol === 'USDC' ? '🔵' : token.symbol === 'USDT' ? '🟢' : '🟡';
-          const balance = parseFloat(token.balance).toFixed(6);
-          balanceText += `${emoji} <b>${token.symbol}:</b> ${balance}\n`;
-        }
-
         balanceText +=
-          `\n<b>📍 Wallet Addresses:</b>\n` +
-          `<b>Solana:</b> <code>${wallet.solanaAddress}</code>\n` +
-          `<b>Arbitrum:</b> <code>${wallet.arbitrumAddress}</code>`;
+          `\n<b>📍 Wallet Address:</b>\n` +
+          `<b>Solana:</b> <code>${wallet.solanaAddress}</code>`;
 
         await this.telegramBotService.sendMessage(chatId, balanceText, {
           reply_markup: {
@@ -242,7 +230,7 @@ export class CallbackHandler {
       }
 
       // Check if this is a Privy wallet
-      if (wallet.solanaAddress && wallet.arbitrumAddress) {
+      if (wallet.solanaAddress) {
         await this.telegramBotService.sendMessage(
           chatId,
           '⏳ Loading your transactions...',
@@ -270,9 +258,8 @@ export class CallbackHandler {
           transactionText += `No recent transactions found.\n\n`;
         }
 
-        transactionText += `<b>📍 Wallet Addresses:</b>\n`;
-        transactionText += `<b>Solana:</b> <code>${wallet.solanaAddress}</code>\n`;
-        transactionText += `<b>Arbitrum:</b> <code>${wallet.arbitrumAddress}</code>`;
+        transactionText += `<b>📍 Wallet Address:</b>\n`;
+        transactionText += `<b>Solana:</b> <code>${wallet.solanaAddress}</code>`;
 
         await this.telegramBotService.sendMessage(chatId, transactionText, {
           reply_markup: {
@@ -285,12 +272,6 @@ export class CallbackHandler {
                 {
                   text: '🟣 Solana Explorer',
                   url: `https://explorer.solana.com/address/${wallet.solanaAddress}?cluster=devnet`,
-                },
-              ],
-              [
-                {
-                  text: '🔷 Arbitrum Explorer',
-                  url: `https://sepolia.arbiscan.io/address/${wallet.arbitrumAddress}`,
                 },
               ],
             ],

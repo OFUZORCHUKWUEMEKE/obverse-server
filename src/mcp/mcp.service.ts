@@ -199,12 +199,12 @@ export class McpService {
       }
 
       // Check if this is a Privy wallet (not yet supported)
-      if (wallet.solanaAddress && wallet.arbitrumAddress) {
+      if (wallet.solanaAddress) {
         return {
           content: [
             {
               type: 'text',
-              text: '⚠️ MCP balance tool is currently only available for legacy Mantle wallets. This feature will be available for multi-chain wallets soon!',
+              text: '⚠️ MCP balance tool is currently only available for legacy Mantle wallets. This feature will be available for Solana wallets soon!',
             },
           ],
         };
@@ -709,8 +709,8 @@ export class McpService {
         };
       }
 
-      // Determine the address to use (Arbitrum for Privy wallets, legacy address for Para wallets)
-      const walletAddress = wallet.arbitrumAddress || wallet.address;
+      // Use legacy wallet address for Para wallets
+      const walletAddress = wallet.address;
 
       if (!walletAddress) {
         return {
