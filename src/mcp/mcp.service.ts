@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { WalletRepository } from 'src/wallet/wallet.repository';
 import { ParaService } from 'src/para/para.service';
+import { PrivyService } from 'src/para/privy.service';
 import { PaymentLinkRepository } from 'src/payment-link/payment-repository';
 import { UserRepository } from 'src/users/user-repository';
 import { TransactionRepository } from 'src/transaction/transacton.repository';
@@ -59,6 +60,7 @@ export class McpService {
   constructor(
     private readonly walletRepository: WalletRepository,
     private readonly paraService: ParaService,
+    private readonly privyService: PrivyService,
     private readonly paymentLinkRepository: PaymentLinkRepository,
     private readonly userRepository: UserRepository,
     private readonly transactionRepository: TransactionRepository,
@@ -198,45 +200,33 @@ export class McpService {
         };
       }
 
-      // Check if this is a Privy wallet (not yet supported)
-      if (wallet.solanaAddress) {
+      if (!wallet.solanaAddress) {
         return {
           content: [
             {
               type: 'text',
-              text: '⚠️ MCP balance tool is currently only available for legacy Mantle wallets. This feature will be available for Solana wallets soon!',
+              text: '❌ No Solana wallet found.',
             },
           ],
         };
       }
 
-      if (!wallet.address) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: '❌ Wallet address not found.',
-            },
-          ],
-        };
-      }
-
-      // Get all balances in parallel
-      const [ethBalance, mantleBalance, tokenBalances] = await Promise.all([
-        this.paraService.getBalance(wallet.address),
-        this.paraService.getMantleBalance(wallet.address),
-        this.paraService.getAllTokenBalances(wallet.address),
-      ]);
+      // Get Solana balances
+      const solBalance = await this.privyService.getSolanaBalance(
+        wallet.solanaAddress,
+      );
+      const solanaTokens = await this.privyService.getAllSolanaTokenBalances(
+        wallet.solanaAddress,
+      );
 
       // Format the response
       let balanceText =
         `💰 Wallet Balance\n\n` +
-        `🔷 ETH: ${ethBalance.balance || '0'} ETH\n` +
-        `🟢 MNT: ${mantleBalance.formatted || '0'} ${mantleBalance.symbol || 'MNT'}\n\n` +
+        `☀️ SOL: ${solBalance.balance || '0'} SOL\n\n` +
         `🪙 Token Balances:\n`;
 
       // Add token balances
-      for (const token of tokenBalances) {
+      for (const token of solanaTokens) {
         const emoji =
           token.symbol === 'USDC'
             ? '🔵'
@@ -247,7 +237,7 @@ export class McpService {
         balanceText += `${emoji} ${token.symbol}: ${balance}\n`;
       }
 
-      balanceText += `\n📍 Wallet Address: ${wallet.address}`;
+      balanceText += `\n📍 Wallet Address: ${wallet.solanaAddress}`;
 
       return {
         content: [
@@ -709,15 +699,15 @@ export class McpService {
         };
       }
 
-      // Use legacy wallet address for Para wallets
-      const walletAddress = wallet.address;
+      // Use Solana wallet address
+      const walletAddress = wallet.solanaAddress;
 
       if (!walletAddress) {
         return {
           content: [
             {
               type: 'text',
-              text: '❌ No valid wallet address found.',
+              text: '❌ No valid Solana wallet address found.',
             },
           ],
         };
@@ -725,7 +715,7 @@ export class McpService {
 
       // Generate unique link ID
       const linkId = this.generateLinkId();
-      const linkUrl = `https://obverse-ui.vercel.app/pay/${linkId}`;
+      const linkUrl = `https://www.obverse.cc/pay/${linkId}`;
 
       // Get token contract address
       const tokenAddresses = {

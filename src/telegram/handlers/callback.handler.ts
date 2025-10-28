@@ -109,91 +109,43 @@ export class CallbackHandler {
         return;
       }
 
+      if (!wallet.solanaAddress) {
+        await this.telegramBotService.sendMessage(
+          chatId,
+          '❌ No Solana wallet found. Use /start to create one.',
+        );
+        return;
+      }
+
       await this.telegramBotService.sendMessage(
         chatId,
         '⏳ Fetching your balances...',
       );
 
-      // Check if this is a Privy wallet or legacy Para wallet
-      if (wallet.solanaAddress) {
-        // Privy wallet - fetch Solana balances
-        this.logger.log(`Fetching balances for Privy wallet: Solana ${wallet.solanaAddress}`);
+      this.logger.log(`Fetching balances for Solana wallet: ${wallet.solanaAddress}`);
 
-        const [solBalance, solanaTokens] = await Promise.all([
-          this.privyService.getSolanaBalance(wallet.solanaAddress),
-          this.privyService.getAllSolanaTokenBalances(wallet.solanaAddress),
-        ]);
-
-        this.logger.log(`Balance fetch completed. SOL: ${solBalance.balance}`);
-
-        let balanceText =
-          `💰 <b>Your Wallet Balance</b>\n\n` +
-          `<b>🟣 Solana Network:</b>\n` +
-          `<b>SOL:</b> ${solBalance.balance || '0'} SOL\n`;
-
-        // Add Solana token balances
-        for (const token of solanaTokens) {
-          const emoji = token.symbol === 'USDC' ? '🔵' : token.symbol === 'USDT' ? '🟢' : '🟡';
-          const balance = parseFloat(token.balance).toFixed(6);
-          balanceText += `${emoji} <b>${token.symbol}:</b> ${balance}\n`;
-        }
-
-        balanceText +=
-          `\n<b>📍 Wallet Address:</b>\n` +
-          `<b>Solana:</b> <code>${wallet.solanaAddress}</code>`;
-
-        await this.telegramBotService.sendMessage(chatId, balanceText, {
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: '🔄 Refresh', callback_data: 'balance' },
-                { text: '💸 Send', callback_data: 'send' },
-              ],
-              [
-                { text: '📊 Transactions', callback_data: 'transactions' },
-                { text: '🔗 Payment Link', callback_data: 'payment' },
-              ],
-            ],
-          },
-        });
-        return;
-      }
-
-      // Legacy Para wallet support
-      if (!wallet.address) {
-        await this.telegramBotService.sendMessage(
-          chatId,
-          '❌ Wallet address not found. Use /start to create a wallet.',
-        );
-        return;
-      }
-
-      this.logger.log(`Fetching balances for legacy Para wallet: ${wallet.address}`);
-      const [ethBalance, mantleBalance, tokenBalances] = await Promise.all([
-        this.paraService.getBalance(wallet.address),
-        this.paraService.getMantleBalance(wallet.address),
-        this.paraService.getAllTokenBalances(wallet.address),
+      const [solBalance, solanaTokens] = await Promise.all([
+        this.privyService.getSolanaBalance(wallet.solanaAddress),
+        this.privyService.getAllSolanaTokenBalances(wallet.solanaAddress),
       ]);
+
+      this.logger.log(`Balance fetch completed. SOL: ${solBalance.balance}`);
 
       let balanceText =
         `💰 <b>Your Wallet Balance</b>\n\n` +
-        `<b>🔷 ETH:</b> ${ethBalance.balance || '0'} ETH\n` +
-        `<b>🟢 MNT:</b> ${mantleBalance.formatted || '0'} ${mantleBalance.symbol || 'MNT'}\n\n` +
-        `<b>🪙 Token Balances:</b>\n`;
+        `<b>🟣 Solana Network:</b>\n` +
+        `<b>SOL:</b> ${solBalance.balance || '0'} SOL\n`;
 
-      // Add token balances
-      for (const token of tokenBalances) {
-        const emoji =
-          token.symbol === 'USDC'
-            ? '🔵'
-            : token.symbol === 'USDT'
-              ? '🟢'
-              : '🟡';
+      // Add Solana token balances
+      for (const token of solanaTokens) {
+        const emoji = token.symbol === 'USDC' ? '🔵' : token.symbol === 'USDT' ? '🟢' : '🟡';
         const balance = parseFloat(token.balance).toFixed(6);
         balanceText += `${emoji} <b>${token.symbol}:</b> ${balance}\n`;
       }
 
-      balanceText += `\n<b>📍 Wallet Address:</b>\n<code>${wallet.address}</code>`;
+      balanceText +=
+        `\n<b>📍 Wallet Address:</b>\n` +
+        `<b>Solana:</b> <code>${wallet.solanaAddress}</code>`;
 
       await this.telegramBotService.sendMessage(chatId, balanceText, {
         reply_markup: {
@@ -229,61 +181,10 @@ export class CallbackHandler {
         return;
       }
 
-      // Check if this is a Privy wallet
-      if (wallet.solanaAddress) {
+      if (!wallet.solanaAddress) {
         await this.telegramBotService.sendMessage(
           chatId,
-          '⏳ Loading your transactions...',
-        );
-
-        const [solanaTransactions] = await Promise.all([
-          this.privyService.getSolanaTransactions(wallet.solanaAddress, 5),
-        ]);
-
-        let transactionText = `📊 <b>Recent Transactions</b>\n\n`;
-
-        // Show Solana transactions
-        if (solanaTransactions.length > 0) {
-          transactionText += `<b>🟣 Solana Transactions:</b>\n\n`;
-          solanaTransactions.forEach((tx, index) => {
-            const statusEmoji = tx.status === 'success' ? '✅' : '❌';
-            const date = tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleDateString() : 'N/A';
-            transactionText += `${index + 1}. ${statusEmoji} ${date}\n`;
-            transactionText += `   Signature: <code>${tx.signature.substring(0, 16)}...</code>\n`;
-            transactionText += `   Fee: ${tx.fee} SOL\n\n`;
-          });
-        }
-
-        if (solanaTransactions.length === 0) {
-          transactionText += `No recent transactions found.\n\n`;
-        }
-
-        transactionText += `<b>📍 Wallet Address:</b>\n`;
-        transactionText += `<b>Solana:</b> <code>${wallet.solanaAddress}</code>`;
-
-        await this.telegramBotService.sendMessage(chatId, transactionText, {
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: '🔄 Refresh', callback_data: 'transactions' },
-                { text: '💰 Balance', callback_data: 'balance' },
-              ],
-              [
-                {
-                  text: '🟣 Solana Explorer',
-                  url: `https://explorer.solana.com/address/${wallet.solanaAddress}?cluster=devnet`,
-                },
-              ],
-            ],
-          },
-        });
-        return;
-      }
-
-      if (!wallet.address) {
-        await this.telegramBotService.sendMessage(
-          chatId,
-          '❌ Wallet address not found.',
+          '❌ No Solana wallet found. Use /start to create one.',
         );
         return;
       }
@@ -293,37 +194,30 @@ export class CallbackHandler {
         '⏳ Loading your transactions...',
       );
 
-      const transactions = await this.paraService.getWalletTransactions(
-        wallet.address,
-        5,
-      );
+      const [solanaTransactions] = await Promise.all([
+        this.privyService.getSolanaTransactions(wallet.solanaAddress, 5),
+      ]);
 
       let transactionText = `📊 <b>Recent Transactions</b>\n\n`;
 
-      // Show native transactions first
-      if (transactions.nativeTransactions.length > 0) {
-        transactionText += `<b>🔷 Native Transactions (MNT/ETH):</b>\n\n`;
-        transactions.nativeTransactions.forEach((tx, index) => {
-          transactionText += `${index + 1}. ${this.paraService.formatTransactionForDisplay(tx)}\n\n`;
+      // Show Solana transactions
+      if (solanaTransactions.length > 0) {
+        transactionText += `<b>🟣 Solana Transactions:</b>\n\n`;
+        solanaTransactions.forEach((tx, index) => {
+          const statusEmoji = tx.status === 'success' ? '✅' : '❌';
+          const date = tx.timestamp ? new Date(tx.timestamp * 1000).toLocaleDateString() : 'N/A';
+          transactionText += `${index + 1}. ${statusEmoji} ${date}\n`;
+          transactionText += `   Signature: <code>${tx.signature.substring(0, 16)}...</code>\n`;
+          transactionText += `   Fee: ${tx.fee} SOL\n\n`;
         });
       }
 
-      // Show token transfers
-      if (transactions.tokenTransfers.length > 0) {
-        transactionText += `<b>🪙 Token Transfers:</b>\n\n`;
-        transactions.tokenTransfers.forEach((transfer, index) => {
-          transactionText += `${index + 1}. ${this.paraService.formatTokenTransferForDisplay(transfer)}\n\n`;
-        });
+      if (solanaTransactions.length === 0) {
+        transactionText += `No recent transactions found.\n\n`;
       }
 
-      if (
-        transactions.nativeTransactions.length === 0 &&
-        transactions.tokenTransfers.length === 0
-      ) {
-        transactionText += `No recent transactions found for your wallet.\n\n`;
-      }
-
-      transactionText += `<b>📍 Wallet Address:</b>\n<code>${wallet.address}</code>`;
+      transactionText += `<b>📍 Wallet Address:</b>\n`;
+      transactionText += `<b>Solana:</b> <code>${wallet.solanaAddress}</code>`;
 
       await this.telegramBotService.sendMessage(chatId, transactionText, {
         reply_markup: {
@@ -334,8 +228,8 @@ export class CallbackHandler {
             ],
             [
               {
-                text: '🌐 View on Explorer',
-                url: `https://explorer.mantle.xyz/address/${wallet.address}`,
+                text: '🟣 Solana Explorer',
+                url: `https://explorer.solana.com/address/${wallet.solanaAddress}?cluster=devnet`,
               },
             ],
           ],
@@ -718,7 +612,7 @@ export class CallbackHandler {
       }
 
       // Generate tracking URL
-      const baseUrl = process.env.BASE_URL || 'https://obverse-ui.vercel.app';
+      const baseUrl = process.env.BASE_URL || 'https://www.obverse.cc';
       const trackingUrl = `${baseUrl}/transactions/${paymentLink.linkId}`;
 
       // Debug logging

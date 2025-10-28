@@ -26,16 +26,6 @@ export class Wallet {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
-  // Legacy Para fields (optional for backward compatibility)
-  @Prop({ unique: true, sparse: true })
-  paraWalletId?: string; // Para wallet identifier
-
-  @Prop({ unique: true, sparse: true })
-  address?: string; // Legacy wallet address (for EVM)
-
-  @Prop({ type: String })
-  walletShareData?: string; // Para keyshare
-
   // Privy fields
   @Prop({ unique: true, sparse: true })
   privyId?: string; // Privy user ID
@@ -95,8 +85,6 @@ export const WalletSchema = SchemaFactory.createForClass(Wallet);
 
 // Add indexes
 WalletSchema.index({ userId: 1 });
-WalletSchema.index({ address: 1 }, { unique: true, sparse: true });
-WalletSchema.index({ paraWalletId: 1 }, { unique: true, sparse: true });
 WalletSchema.index({ privyId: 1 }, { unique: true, sparse: true });
 WalletSchema.index({ solanaAddress: 1 }, { unique: true, sparse: true });
 WalletSchema.index({ status: 1 });
