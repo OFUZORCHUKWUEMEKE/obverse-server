@@ -347,16 +347,21 @@ export class MessageHandler {
     msg: TelegramBot.Message,
   ) {
     try {
-      // Check if user already has a wallet
       const telegramId = msg.from?.id.toString();
-      const exWallet = await this.walletRepository.findOne({
-        userId: telegramId,
-      });
-      console.log(exWallet)
+
       if (!telegramId) {
         throw new Error('telegramId is undefined');
       }
+
+      // Check if user already has a wallet
+      const exWallet = await this.walletRepository.findOne({
+        userId: telegramId,
+      });
+      console.log(exWallet);
+
       const username = msg.from?.username?.toString() || telegramId;
+
+      // Find or create user
       let user = await this.userRepository.findOne({ telegramId });
       if (!user) {
         user = await this.userRepository.create({
@@ -370,14 +375,17 @@ export class MessageHandler {
         });
         this.logger.log(`New user created: ${telegramId}`);
       } else {
-        // Update last seen
+        // Update last seen for existing users
         user.lastSeenAt = new Date();
         await this.userRepository.save(user);
       }
+
+      // Handle new wallet creation
       if (!exWallet) {
         this.logger.log(
           `No existing wallet found for user ${telegramId}. Creating a new one...`,
         );
+
         const wallet = await this.privyService.createWallet(telegramId);
         if (!wallet) {
           this.logger.error(`Failed to create wallet for user ${telegramId}`);
@@ -387,6 +395,7 @@ export class MessageHandler {
           );
           return;
         }
+
         const newWallet = await this.walletRepository.create({
           userId: telegramId,
           privyId: wallet.privyId,
@@ -395,6 +404,7 @@ export class MessageHandler {
           createdAt: new Date(),
           updatedAt: new Date(),
         });
+
         this.logger.log(
           `New Privy wallet created for user ${telegramId}. Solana: ${newWallet.solanaAddress}`,
         );
@@ -420,6 +430,7 @@ export class MessageHandler {
           // Continue anyway - token accounts can be created later if needed
         }
 
+        // Send welcome message for NEW users
         const welcomeText =
           `🎉 <b>Welcome!</b>\n\n` +
           `Your Solana wallet is ready to use.\n\n` +
@@ -444,31 +455,33 @@ export class MessageHandler {
             ],
           },
         });
-      }
-      const welcomeText =
-        `🎉 <b>Welcome back!</b>\n\n` +
-        `Your Solana wallet is ready to use.\n\n` +
-        `<b>🟣 Solana Address:</b>\n<code>${exWallet?.solanaAddress}</code>\n\n` +
-        `What would you like to do?\n\n` +
-        `💰 /balance - Check your balance\n` +
-        `📊 /transactions - View transaction history\n` +
-        `💸 /send - Send cryptocurrency\n` +
-        `🔗 /payment - Create payment link`;
+      } else {
+        // Send welcome back message for EXISTING users
+        const welcomeText =
+          `🎉 <b>Welcome back!</b>\n\n` +
+          `Your Solana wallet is ready to use.\n\n` +
+          `<b>🟣 Solana Address:</b>\n<code>${exWallet.solanaAddress}</code>\n\n` +
+          `What would you like to do?\n\n` +
+          `💰 /balance - Check your balance\n` +
+          `📊 /transactions - View transaction history\n` +
+          `💸 /send - Send cryptocurrency\n` +
+          `🔗 /payment - Create payment link`;
 
-      await this.telegramService.sendMessage(chatId, welcomeText, {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: '💰 Balance', callback_data: 'balance' },
-              { text: '📊 Transactions', callback_data: 'transactions' },
+        await this.telegramService.sendMessage(chatId, welcomeText, {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '💰 Balance', callback_data: 'balance' },
+                { text: '📊 Transactions', callback_data: 'transactions' },
+              ],
+              [
+                { text: '💸 Send', callback_data: 'send' },
+                { text: '🔗 Payment Link', callback_data: 'payment' },
+              ],
             ],
-            [
-              { text: '💸 Send', callback_data: 'send' },
-              { text: '🔗 Payment Link', callback_data: 'payment' },
-            ],
-          ],
-        },
-      });
+          },
+        });
+      }
     } catch (error) {
       this.logger.error('Error in start command:', error);
       await this.telegramService.sendErrorMessage(
