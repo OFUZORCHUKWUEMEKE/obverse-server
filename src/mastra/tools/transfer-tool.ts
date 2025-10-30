@@ -501,7 +501,7 @@ async function recordTransaction(
     fromAddress: wallet.address,
     toAddress,
     transactionHash,
-    network: 'MANTLE',
+    network: 'SOLANA',
     gasUsed: null, // Will be updated when transaction is confirmed
     metadata: {
       source: 'transfer_tool',

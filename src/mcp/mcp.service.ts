@@ -732,7 +732,7 @@ export class McpService {
         amount: state.amount!,
         token: state.token!,
         tokenAddress: tokenAddresses[state.token!],
-        network: BlockchainNetwork.MANTLE,
+        network: BlockchainNetwork.SOLANA,
         type: PaymentLinkType.ONE_TIME,
         status: PaymentLinkStatus.ACTIVE,
         title: state.name!,
