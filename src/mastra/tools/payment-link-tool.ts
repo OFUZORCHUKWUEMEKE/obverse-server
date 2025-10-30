@@ -78,7 +78,7 @@ export const createPaymentLinkTool = (
           amount,
           token,
           tokenAddress: tokenAddresses[token],
-          network: BlockchainNetwork.MANTLE,
+          network: BlockchainNetwork.SOLANA,
           type: PaymentLinkType.ONE_TIME,
           status: PaymentLinkStatus.ACTIVE,
           title: name,
