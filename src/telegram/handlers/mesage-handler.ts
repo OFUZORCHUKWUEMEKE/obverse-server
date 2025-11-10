@@ -14,6 +14,10 @@ import { BlockchainNetwork } from 'src/wallet/wallet.model';
 import { McpService } from 'src/mcp/mcp.service';
 import { MastraService } from 'src/mastra/mastra.service';
 import * as QRCode from 'qrcode';
+import {
+  getTokenAddress,
+  getDefaultSolanaNetwork,
+} from 'src/config/blockchain.config';
 
 interface PaymentLinkCreationState {
   step: 'name' | 'token' | 'amount' | 'details' | 'confirm';
@@ -1187,12 +1191,12 @@ export class MessageHandler {
       const linkId = this.generateLinkId();
       const linkUrl = `https://www.obverse.cc/pay/${linkId}`;
 
-      // Get token contract address
-      const tokenAddresses = {
-        USDC: '0x09Bc4E0D864854c6aFB6eB9A9cdF58ac190D0dF9',
-        USDT: '0x201EBa5CC46D216Ce6DC03F6a759e8E766e956Ae',
-        DAI: '0xdA10009cBd5D07dd0CeCc66161FC93D7c9000da1',
-      };
+      // Get default network and token address
+      const network = getDefaultSolanaNetwork();
+      const tokenAddress = getTokenAddress(
+        network,
+        state.token! as 'USDC' | 'USDT',
+      );
 
       const paymentLink = await this.paymentLinkRepository.create({
         address: walletAddress,
@@ -1201,8 +1205,8 @@ export class MessageHandler {
         linkId,
         amount: state.amount,
         token: state.token,
-        tokenAddress: tokenAddresses[state.token!],
-        network: BlockchainNetwork.SOLANA,
+        tokenAddress,
+        network,
         type: PaymentLinkType.ONE_TIME,
         status: PaymentLinkStatus.ACTIVE,
         title: state.name!,

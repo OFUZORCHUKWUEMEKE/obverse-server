@@ -6,6 +6,10 @@ import {
 } from '../../payment-link/payment-link.model';
 import { BlockchainNetwork } from '../../wallet/wallet.model';
 import * as QRCode from 'qrcode';
+import {
+  getTokenAddress,
+  getDefaultSolanaNetwork,
+} from '../../config/blockchain.config';
 // Preview image generation is handled by the controller endpoint
 
 export const createPaymentLinkTool = (
@@ -63,12 +67,9 @@ export const createPaymentLinkTool = (
         const baseUrl = process.env.BASE_URL || 'https://www.obverse.cc';
         const linkUrl = `${baseUrl}/pay/${linkId}`;
 
-        // Token contract addresses
-        const tokenAddresses = {
-          USDC: '0x09Bc4E0D864854c6aFB6eB9A9cdF58ac190D0dF9',
-          USDT: '0x201EBa5CC46D216Ce6DC03F6a759e8E766e956Ae',
-          DAI: '0xdA10009cBd5D07dd0CeCc66161FC93D7c9000da1',
-        };
+        // Get default network and token address
+        const network = getDefaultSolanaNetwork();
+        const tokenAddress = getTokenAddress(network, token as 'USDC' | 'USDT');
 
         // Create payment link
         const paymentLink = await paymentLinkRepository.create({
@@ -77,8 +78,8 @@ export const createPaymentLinkTool = (
           linkId,
           amount,
           token,
-          tokenAddress: tokenAddresses[token],
-          network: BlockchainNetwork.SOLANA,
+          tokenAddress,
+          network,
           type: PaymentLinkType.ONE_TIME,
           status: PaymentLinkStatus.ACTIVE,
           title: name,

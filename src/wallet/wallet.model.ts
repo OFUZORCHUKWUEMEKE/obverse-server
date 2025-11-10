@@ -15,7 +15,9 @@ export enum BlockchainNetwork {
   BSC = 'bsc',
   OPTIMISM = 'optimism',
   MANTLE = 'mantle',
-  SOLANA = 'solana',
+  SOLANA_MAINNET = 'solana-mainnet',
+  SOLANA_DEVNET = 'solana-devnet',
+  SOLANA_TESTNET = 'solana-testnet',
 }
 
 @Schema({

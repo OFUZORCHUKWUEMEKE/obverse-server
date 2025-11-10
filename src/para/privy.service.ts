@@ -19,10 +19,12 @@ import {
   createAssociatedTokenAccountInstruction,
   createTransferInstruction,
 } from '@solana/spl-token';
-
-export enum BlockchainNetwork {
-  SOLANA = 'solana',
-}
+import { BlockchainNetwork } from '../wallet/wallet.model';
+import {
+  getNetworkTokenAddresses,
+  getDefaultSolanaNetwork,
+  getSolanaRpcUrl,
+} from '../config/blockchain.config';
 
 export interface TransactionResult {
   signature: string;
@@ -52,12 +54,8 @@ export class PrivyService {
   private readonly logger = new Logger(PrivyService.name);
   private readonly privyClient: PrivyClient;
   private readonly solanaConnection: Connection;
-
-  // Token addresses for Solana Devnet
-  private readonly SOLANA_TOKENS = {
-    USDC: 'Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr', // Devnet USDC
-    USDT: '9NGDi2tZtNmCCp8SVLKNuGjuWAVwNF3Vap5tT7sCCGCV', // Devnet USDT
-  };
+  private readonly network: BlockchainNetwork;
+  private readonly SOLANA_TOKENS: Record<string, string>;
 
   constructor(private configService: ConfigService) {
     this.privyClient = new PrivyClient({
@@ -65,14 +63,19 @@ export class PrivyService {
       appSecret: this.configService.get<string>('PRIVY_APP_SECRET') || '',
     });
 
-    // Initialize Solana connection
-    const solanaRpcUrl =
-      this.configService.get<string>('HELIUS_RPC_URL_DEVNET') ||
-      this.configService.get<string>('SOLANA_RPC_URL') ||
-      'https://api.devnet.solana.com';
+    // Get default network from configuration
+    this.network = getDefaultSolanaNetwork();
+
+    // Get token addresses for the configured network
+    this.SOLANA_TOKENS = getNetworkTokenAddresses(this.network);
+
+    // Initialize Solana connection using network-specific RPC URL
+    const solanaRpcUrl = getSolanaRpcUrl(this.network);
     this.solanaConnection = new Connection(solanaRpcUrl, 'confirmed');
 
-    this.logger.log('Privy Service initialized successfully');
+    this.logger.log(
+      `Privy Service initialized successfully with network: ${this.network}`,
+    );
   }
 
   /**

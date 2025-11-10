@@ -13,6 +13,10 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { mantle } from 'viem/chains';
+import {
+  getNetworkTokenAddresses,
+  getDefaultSolanaNetwork,
+} from '../../config/blockchain.config';
 
 const erc20Abi = [
   {
@@ -41,12 +45,13 @@ const erc20Abi = [
   },
 ] as const;
 
-// Token contract addresses on Mantle network
-const TOKEN_ADDRESSES = {
-  USDC: '0x09Bc4E0D864854c6aFB6eB9A9cdF58ac190D0dF9' as `0x${string}`,
-  USDT: '0x201EBa5CC46D216Ce6DC03F6a759e8E766e956Ae' as `0x${string}`,
-  DAI: '0xdA10009cBd5D07dd0CeCc66161FC93D7c9000da1' as `0x${string}`,
-} as const;
+// Get token addresses from centralized configuration
+// Note: This tool is designed for EVM transfers and may not be actively used for Solana
+const network = getDefaultSolanaNetwork();
+const TOKEN_ADDRESSES = getNetworkTokenAddresses(network) as {
+  USDC: string;
+  USDT: string;
+};
 
 const TOKEN_DECIMALS = {
   USDC: 6,
@@ -501,7 +506,7 @@ async function recordTransaction(
     fromAddress: wallet.address,
     toAddress,
     transactionHash,
-    network: 'SOLANA',
+    network: network,
     gasUsed: null, // Will be updated when transaction is confirmed
     metadata: {
       source: 'transfer_tool',

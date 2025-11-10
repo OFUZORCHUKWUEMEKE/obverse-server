@@ -1,5 +1,6 @@
 import { Tool } from '@mastra/core';
 import { z } from 'zod';
+import { getDefaultSolanaNetwork } from '../../config/blockchain.config';
 
 export const createBalanceTool = (walletService: any, privyService: any) => {
   return new Tool({
@@ -47,7 +48,7 @@ export const createBalanceTool = (walletService: any, privyService: any) => {
 
         const balanceData = {
           walletAddress: address,
-          network: 'solana',
+          network: getDefaultSolanaNetwork(),
           nativeBalance: {
             SOL: {
               balance: solBalance.balance || '0',
