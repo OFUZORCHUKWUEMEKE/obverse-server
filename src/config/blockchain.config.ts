@@ -99,6 +99,6 @@ export function getDefaultSolanaNetwork(): BlockchainNetwork {
     case 'devnet':
     case 'solana-devnet':
     default:
-      return BlockchainNetwork.SOLANA_DEVNET;
+      return BlockchainNetwork.SOLANA_MAINNET;
   }
 }
